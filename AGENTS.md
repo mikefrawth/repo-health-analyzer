@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live as GitHub issues (via `gh` CLI) — repo not yet git-initialized/remote-configured; see note in the file. See `docs/agents/issue-tracker.md`.
+Issues live as GitHub issues (via `gh` CLI, or the web UI if `gh` isn't installed) at [mikefrawth/repo-health-analyzer](https://github.com/mikefrawth/repo-health-analyzer). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

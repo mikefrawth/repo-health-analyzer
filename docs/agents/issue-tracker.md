@@ -2,7 +2,7 @@
 
 Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
-> Note: this directory is not yet a git repository and has no GitHub remote configured. Run `git init` and add a GitHub remote before these commands will work — `gh` infers the repo from `git remote -v`.
+Remote: [mikefrawth/repo-health-analyzer](https://github.com/mikefrawth/repo-health-analyzer) (public). If `gh` isn't installed on this machine, use the web UI (`gh` was unavailable when this repo was first published, so its first issue — [#1](https://github.com/mikefrawth/repo-health-analyzer/issues/1) — was created that way).
 
 ## Conventions
 

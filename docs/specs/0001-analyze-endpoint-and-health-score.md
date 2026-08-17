@@ -83,10 +83,10 @@ Tests only exercise behavior through public seams — never internal call sequen
 - The Next.js frontend, the `/api/analyze` route, the Supabase schema and RLS policies, and the results UI — none of this exists yet in this build pass.
 - Deployment (Vercel/Railway/Render) and the associated Dockerfile validation beyond a written, unexecuted `backend/Dockerfile`.
 - Private repository support, GitHub OAuth, user accounts, and IP-based rate limiting — all explicitly deferred per the original project spec's "Then" section.
-- Publishing this spec to a GitHub issue tracker — no GitHub remote exists yet for this repository as of this spec being written; a local `git init` was run in this session, but the remote and `gh` authentication are still pending.
 
 ## Further Notes
 
 - The two defects fixed in this pass (commit-activity window, confidence cap) were found by a throwaway logic prototype (`backend/prototypes/health-score-formula.PROTOTYPE.html`) that drove the formula through five repository profiles before any real repository had exercised it — not by code review or unit testing. The prototype is retained, deliberately un-synced with the fixed formula, as the primary source documenting how the defects were found; see [ADR-0003](../adr/0003-health-score-activity-window-and-confidence-cap.md) for the fix itself.
 - `CONTEXT.md` is the authoritative glossary for the vocabulary used throughout this spec (Target Repository, Report, Partial Report, Metrics, Health Score, Complexity Signal, Analysis Scope, AI Summary) — consult it before renaming or introducing terms in implementation.
 - The backend test suite is green at 84 tests as of this spec (`backend/tests/`, run via `pytest` from `backend/` with `PYTHONPATH=.`).
+- Published as `mikefrawth/repo-health-analyzer#1`.
