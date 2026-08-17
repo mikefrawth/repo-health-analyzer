@@ -26,7 +26,7 @@ from .scope import (
     take_by_suffix,
     walk_repository,
 )
-from .scoring import health_score
+from .scoring import component_scores, health_score
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ async def analyze(repo_url: str, settings: Settings) -> AnalyzeResponse:
 
     metrics, scope = await run_in_threadpool(_measure_clone, owner, repo, settings)
     score = health_score(metrics)
+    scores = component_scores(metrics)
 
     # A failed summary yields a Partial Report; the metrics stand on their own.
     summary = await generate_summary(repo_url, metrics, score, scope, settings)
@@ -92,5 +93,6 @@ async def analyze(repo_url: str, settings: Settings) -> AnalyzeResponse:
         metrics=metrics,
         health_score=score,
         analysis_scope=scope,
+        component_scores=scores,
         ai_summary=summary,
     )

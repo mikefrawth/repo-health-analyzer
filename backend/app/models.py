@@ -66,5 +66,9 @@ class AnalyzeResponse(BaseModel):
     metrics: Metrics
     health_score: int
     analysis_scope: AnalysisScope
+    # The same values `component_scores(metrics)` computes internally for
+    # `health_score` — exposed so a Report can disclose why the score is what
+    # it is. A component absent here has no Component Score, per CONTEXT.md.
+    component_scores: dict[str, float]
     # None means a Partial Report: Metrics succeeded, the AI Summary did not.
     ai_summary: AISummary | None = None

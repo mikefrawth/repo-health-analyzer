@@ -10,7 +10,7 @@ from app import analyzer
 from app.config import Settings, get_settings
 from app.main import app
 from app.models import AISummary, AnalysisScope
-from app.scoring import health_score
+from app.scoring import component_scores, health_score
 from conftest import make_metrics
 from fastapi.testclient import TestClient
 
@@ -83,6 +83,7 @@ def test_unavailable_ai_summary_still_returns_a_report(client, stub_repository):
     assert body["health_score"] == health_score(stub_repository)
     assert body["metrics"]["has_tests"] is False
     assert body["analysis_scope"]["total_files_seen"] == 120
+    assert body["component_scores"] == pytest.approx(component_scores(stub_repository))
 
 
 def test_a_successful_summary_is_returned_alongside_the_metrics(

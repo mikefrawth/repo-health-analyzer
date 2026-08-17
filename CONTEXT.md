@@ -38,3 +38,7 @@ _Avoid_: AI analysis, LLM output, commentary
 
 **Strength / Risk / Suggestion**:
 The three fixed categories of qualitative observation that make up an AI Summary — respectively, what the Target Repository does well, what threatens its health, and what would improve it.
+
+**Component Score**:
+One of the per-category 0.0–1.0 measurements (tests, CI, README, commit recency, commit activity, dependency hygiene, complexity) that the Health Score formula weights and combines. A component with no measurable value (e.g. no Complexity Signal) has no Component Score at all — never a `0.0` — and is dropped from the formula's renormalization rather than counted against the Target Repository.
+_Avoid_: metric score, sub-score, component metric

@@ -43,12 +43,19 @@ export type AISummary = {
   suggestions: string[];
 };
 
+/**
+ * Per-component 0.0-1.0 scores that `health_score` was computed from. A
+ * component absent here has no Component Score at all, per CONTEXT.md.
+ */
+export type ComponentScores = Record<string, number>;
+
 /** The backend's `POST /analyze` response body. */
 export type AnalyzeResponse = {
   repo_url: string;
   metrics: Metrics;
   health_score: number;
   analysis_scope: AnalysisScope;
+  component_scores: ComponentScores;
   /** `null` is a Partial Report — a complete, valid Report, not an error. */
   ai_summary: AISummary | null;
 };
