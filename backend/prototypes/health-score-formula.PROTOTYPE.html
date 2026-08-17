@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Health Score — formula prototype</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --ink: #1c1a17;
+    --muted: #6b655c;
+    --line: #e5e1da;
+    --accent: #b4531f;
+    --accent-soft: #fdf1e9;
+    --dropped: #a9a29a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16150f;
+      --panel: #1e1d17;
+      --ink: #f0ece4;
+      --muted: #a29a8e;
+      --line: #33302a;
+      --accent: #e8834a;
+      --accent-soft: #2a2019;
+      --dropped: #6a635a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 1.5rem 5rem;
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.65 Georgia, "Iowan Old Style", serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.9rem; margin: 0 0 .4rem; letter-spacing: -.01em; }
+  h2 {
+    font-size: .78rem; text-transform: uppercase; letter-spacing: .11em;
+    color: var(--muted); margin: 2.6rem 0 .9rem;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 600;
+  }
+  .question {
+    background: var(--accent-soft); border-left: 3px solid var(--accent);
+    padding: 1rem 1.2rem; margin: 1.4rem 0 0; font-size: .95rem;
+  }
+  .question strong { color: var(--accent); }
+  .badge {
+    display: inline-block; font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: .68rem; font-weight: 700; letter-spacing: .1em;
+    color: var(--accent); border: 1px solid var(--accent);
+    padding: .18rem .5rem; border-radius: 3px; margin-bottom: .9rem;
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 1.4rem 1.6rem;
+  }
+  .scoreline { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  .score { font-size: 3.6rem; font-weight: 700; line-height: 1; color: var(--accent); }
+  .score-of { color: var(--muted); font-size: 1.1rem; }
+  .verdict { margin-left: auto; color: var(--muted); font-size: .95rem; font-style: italic; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1.3rem; font-size: .9rem; }
+  th {
+    text-align: left; font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); font-weight: 600; padding: 0 .5rem .5rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  td { padding: .55rem .5rem .55rem 0; border-bottom: 1px solid var(--line); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.dropped td { color: var(--dropped); font-style: italic; }
+  tr.total td { font-weight: 700; border-bottom: none; }
+  .bar { display: inline-block; height: 7px; background: var(--accent); border-radius: 4px; vertical-align: middle; }
+  .bar-track { display: inline-block; width: 70px; height: 7px; background: var(--line); border-radius: 4px; margin-right: .5rem; vertical-align: middle; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .5rem 1.4rem; margin-top: 1.2rem; font-size: .88rem; }
+  .fact { display: flex; justify-content: space-between; gap: .6rem; border-bottom: 1px dotted var(--line); padding-bottom: .25rem; }
+  .fact span:first-child { color: var(--muted); }
+  .fact span:last-child { font-weight: 600; }
+  button {
+    font: inherit; font-family: ui-sans-serif, system-ui, sans-serif; font-size: .85rem;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 5px; padding: .45rem .8rem; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  .btns { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .tabs { display: flex; flex-wrap: wrap; gap: .4rem; border-bottom: 1px solid var(--line); margin-bottom: 1.1rem; }
+  .tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: .5rem .7rem; }
+  .tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .scenario-desc { font-size: .93rem; color: var(--muted); margin-bottom: 1.1rem; }
+  .step { display: flex; align-items: center; gap: .75rem; padding: .4rem 0; }
+  .step-n {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center; font-size: .72rem; font-weight: 700;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    background: var(--line); color: var(--muted);
+  }
+  .step.active .step-n { background: var(--accent); color: #fff; }
+  .step.done .step-n { background: var(--accent-soft); color: var(--accent); }
+  .step.done .step-label { text-decoration: line-through; color: var(--dropped); }
+  .step button:disabled { opacity: .4; cursor: default; }
+  .step button:disabled:hover { border-color: var(--line); color: var(--ink); }
+  .watch { font-size: .88rem; background: var(--accent-soft); padding: .8rem 1rem; border-radius: 6px; margin-top: 1.1rem; }
+  .changed { color: var(--accent); font-weight: 700; }
+  footer { margin-top: 3rem; font-size: .82rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="badge">Prototype — throwaway — ANSWERED</div>
+  <h1>What does the Health Score actually do?</h1>
+
+  <div class="question">
+    <strong>Verdict:</strong> this prototype found two real defects, both now fixed in
+    <code>backend/app/scoring.py</code> and <code>metrics.py</code> (see <code>docs/adr/</code>
+    for the record). <strong>(1)</strong> Commit activity counted every commit in the clone with
+    no regard for age, so a repository dead for three years got full marks for having a past —
+    fixed by counting only commits inside a 90-day window. <strong>(2)</strong> Renormalisation
+    let an unmeasurable repository (no manifest, no complexity analyser) reach a perfect 100 —
+    fixed by capping the score in proportion to how much was actually measured. This page still
+    runs the <em>original, pre-fix</em> formula, kept as the primary source for how the defects
+    were found — the module below is intentionally not updated to match.
+  </div>
+
+  <h2>The repository being scored</h2>
+  <div class="panel">
+    <div class="scoreline">
+      <div><span class="score" id="score">—</span><span class="score-of"> / 100</span></div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+    <div class="facts" id="facts"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>What we measured</th>
+          <th>Finding</th>
+          <th class="num">Rating</th>
+          <th class="num">Worth</th>
+          <th class="num">Earned</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="watch" id="note"></div>
+  </div>
+
+  <h2>Change something and watch the score move</h2>
+  <div class="btns" id="freeplay"></div>
+
+  <h2>Guided walkthroughs</h2>
+  <div class="tabs" id="tabs"></div>
+  <div class="panel">
+    <div class="scenario-desc" id="scenario-desc"></div>
+    <div id="steps"></div>
+  </div>
+
+  <footer>
+    Throwaway prototype for the Health Score formula in <code>backend/app/scoring.py</code>.
+    The scoring module below is a faithful port of that file — if the weights change here,
+    they change there. The page around it is disposable.
+  </footer>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// PORTABLE MODULE — a faithful port of backend/app/scoring.py.
+// Pure: no DOM, no handlers. If a weight or curve is wrong, it is wrong here
+// and there identically, which is the point of the prototype.
+// ─────────────────────────────────────────────────────────────────────────────
+const Scoring = (() => {
+  const WEIGHTS = {
+    tests: 20, ci: 15, readme: 15,
+    commit_recency: 12, commit_activity: 8,
+    dependency_hygiene: 10, complexity: 20,
+  };
+  const FRESH_DAYS = 30, STALE_DAYS = 365;
+  const ACTIVE_COMMITS = 20;
+  const LEAN_DEPS = 50, BLOATED_DEPS = 200, BLOATED_DEPS_SCORE = 0.3;
+  const SIMPLE_CC = 5, TANGLED_CC = 20;
+
+  const lerpDown = (v, best, worst) =>
+    v <= best ? 1 : v >= worst ? 0 : 1 - (v - best) / (worst - best);
+
+  const commitRecency = d => d === null ? null : lerpDown(d, FRESH_DAYS, STALE_DAYS);
+  const commitActivity = c => Math.min(c, ACTIVE_COMMITS) / ACTIVE_COMMITS;
+
+  const dependencyHygiene = n => {
+    if (n === null) return null;
+    if (n <= LEAN_DEPS) return 1;
+    const scaled = lerpDown(n, LEAN_DEPS, BLOATED_DEPS);
+    return BLOATED_DEPS_SCORE + scaled * (1 - BLOATED_DEPS_SCORE);
+  };
+
+  const complexity = signal => {
+    if (!signal) return null;
+    if (signal.kind === "maintainability") return Math.max(0, Math.min(1, signal.value / 100));
+    return lerpDown(signal.value, SIMPLE_CC, TANGLED_CC);
+  };
+
+  function componentScores(m) {
+    const raw = {
+      tests: m.has_tests ? 1 : 0,
+      ci: m.has_ci ? 1 : 0,
+      readme: m.has_readme ? 1 : 0,
+      commit_recency: commitRecency(m.last_commit_days_ago),
+      commit_activity: commitActivity(m.commits_in_window),
+      dependency_hygiene: dependencyHygiene(m.dependency_count),
+      complexity: complexity(m.complexity),
+    };
+    return Object.fromEntries(Object.entries(raw).filter(([, s]) => s !== null));
+  }
+
+  function healthScore(m) {
+    const scores = componentScores(m);
+    const total = Object.keys(scores).reduce((a, k) => a + WEIGHTS[k], 0);
+    if (total === 0) return 0;
+    const earned = Object.entries(scores).reduce((a, [k, s]) => a + WEIGHTS[k] * s, 0);
+    return Math.round(earned / total * 100);
+  }
+
+  return { WEIGHTS, componentScores, healthScore };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reducer over the repository being scored. Also pure.
+// ─────────────────────────────────────────────────────────────────────────────
+const PROFILES = {
+  healthy: {
+    label: "Well-kept Python library",
+    has_tests: true, has_ci: true, has_readme: true,
+    last_commit_days_ago: 3, commits_in_window: 50, dependency_count: 12,
+    complexity: { kind: "maintainability", value: 78 },
+  },
+  abandoned: {
+    label: "Abandoned but excellent",
+    has_tests: true, has_ci: true, has_readme: true,
+    last_commit_days_ago: 900, commits_in_window: 50, dependency_count: 8,
+    complexity: { kind: "maintainability", value: 88 },
+  },
+  fresh_empty: {
+    label: "Brand-new empty repo",
+    has_tests: false, has_ci: false, has_readme: false,
+    last_commit_days_ago: 0, commits_in_window: 2, dependency_count: null,
+    complexity: null,
+  },
+  unmeasurable: {
+    label: "Go service, no manifest",
+    has_tests: true, has_ci: true, has_readme: true,
+    last_commit_days_ago: 14, commits_in_window: 30, dependency_count: null,
+    complexity: null,
+  },
+  sprawling: {
+    label: "Sprawling JS monolith",
+    has_tests: false, has_ci: true, has_readme: true,
+    last_commit_days_ago: 2, commits_in_window: 50, dependency_count: 340,
+    complexity: { kind: "avg_cyclomatic", value: 18 },
+  },
+};
+
+function reduce(state, action) {
+  const s = { ...state };
+  switch (action.type) {
+    case "PROFILE":       return { ...PROFILES[action.key] };
+    case "TOGGLE_TESTS":  s.has_tests = !s.has_tests; return s;
+    case "TOGGLE_CI":     s.has_ci = !s.has_ci; return s;
+    case "TOGGLE_README": s.has_readme = !s.has_readme; return s;
+    case "AGE":           s.last_commit_days_ago = action.days; return s;
+    case "COMMITS":       s.commits_in_window = action.n; return s;
+    case "DEPS":          s.dependency_count = action.n; return s;
+    case "COMPLEXITY":    s.complexity = action.signal; return s;
+    default: return s;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Throwaway page shell below this line.
+// ─────────────────────────────────────────────────────────────────────────────
+const LABELS = {
+  tests: ["Has a test suite", m => m.has_tests ? "yes" : "no"],
+  ci: ["Has CI configured", m => m.has_ci ? "yes" : "no"],
+  readme: ["Has a README", m => m.has_readme ? "yes" : "no"],
+  commit_recency: ["Last commit", m => m.last_commit_days_ago === null ? "unknown" :
+    m.last_commit_days_ago === 0 ? "today" : `${m.last_commit_days_ago} days ago`],
+  commit_activity: ["Recent commits", m => `${m.commits_in_window} in the clone window`],
+  dependency_hygiene: ["Dependencies", m => m.dependency_count === null ?
+    "no manifest found" : `${m.dependency_count} declared`],
+  complexity: ["Code complexity", m => !m.complexity ? "no supported analyser" :
+    m.complexity.kind === "maintainability"
+      ? `maintainability ${m.complexity.value}/100`
+      : `avg. cyclomatic ${m.complexity.value}`],
+};
+
+let state = { ...PROFILES.healthy };
+let prevScore = null;
+
+function verdictFor(n) {
+  if (n >= 85) return "reads as: actively maintained, low risk";
+  if (n >= 70) return "reads as: solid, some gaps";
+  if (n >= 50) return "reads as: usable but neglected";
+  if (n >= 30) return "reads as: risky to depend on";
+  return "reads as: effectively unmaintained";
+}
+
+function render(changeNote) {
+  const score = Scoring.healthScore(state);
+  const scores = Scoring.componentScores(state);
+  const totalWeight = Object.keys(scores).reduce((a, k) => a + Scoring.WEIGHTS[k], 0);
+
+  document.getElementById("score").textContent = score;
+  document.getElementById("verdict").textContent = verdictFor(score);
+
+  document.getElementById("facts").innerHTML = `
+    <div class="fact"><span>Profile</span><span>${state.label || "custom"}</span></div>
+    <div class="fact"><span>Weights in play</span><span>${totalWeight} of 100</span></div>
+    <div class="fact"><span>Measurements dropped</span><span>${7 - Object.keys(scores).length}</span></div>`;
+
+  document.getElementById("rows").innerHTML = Object.keys(Scoring.WEIGHTS).map(key => {
+    const [label, describe] = LABELS[key];
+    const has = key in scores;
+    if (!has) {
+      return `<tr class="dropped"><td>${label}</td><td>${describe(state)}</td>
+        <td class="num">—</td><td class="num">dropped</td><td class="num">—</td></tr>`;
+    }
+    const rating = scores[key];
+    // Each surviving weight is scaled up to fill the gap left by dropped ones.
+    const effective = Scoring.WEIGHTS[key] / totalWeight * 100;
+    return `<tr>
+      <td>${label}</td><td>${describe(state)}</td>
+      <td class="num"><span class="bar-track"><span class="bar" style="width:${(rating * 70).toFixed(0)}px"></span></span>${(rating * 100).toFixed(0)}%</td>
+      <td class="num">${effective.toFixed(1)}</td>
+      <td class="num">${(effective * rating).toFixed(1)}</td>
+    </tr>`;
+  }).join("") + `<tr class="total"><td colspan="4">Health Score</td><td class="num">${score}</td></tr>`;
+
+  const dropped = 7 - Object.keys(scores).length;
+  let note = changeNote ? `<span class="changed">${changeNote}</span> ` : "";
+  note += dropped > 0
+    ? `${dropped} measurement${dropped > 1 ? "s" : ""} couldn't be taken on this repository, so
+       ${dropped > 1 ? "their" : "its"} weight was removed and every other measurement is worth
+       proportionally more — the "Worth" column shows the scaled-up values, not the raw weights.`
+    : `Every measurement was available, so each is worth exactly its raw weight.`;
+  if (prevScore !== null && prevScore !== score) {
+    note = `<span class="changed">Score moved ${prevScore} → ${score}.</span> ` + note;
+  }
+  document.getElementById("note").innerHTML = note;
+  prevScore = score;
+}
+
+function dispatch(action, note) {
+  state = reduce(state, action);
+  render(note);
+}
+
+const FREEPLAY = [
+  ["Load: well-kept library", { type: "PROFILE", key: "healthy" }],
+  ["Load: abandoned but excellent", { type: "PROFILE", key: "abandoned" }],
+  ["Load: brand-new empty repo", { type: "PROFILE", key: "fresh_empty" }],
+  ["Load: Go service, no manifest", { type: "PROFILE", key: "unmeasurable" }],
+  ["Load: sprawling JS monolith", { type: "PROFILE", key: "sprawling" }],
+  ["Toggle test suite", { type: "TOGGLE_TESTS" }],
+  ["Toggle CI", { type: "TOGGLE_CI" }],
+  ["Toggle README", { type: "TOGGLE_README" }],
+  ["Commit today", { type: "AGE", days: 0 }],
+  ["Age 6 months", { type: "AGE", days: 180 }],
+  ["Age 3 years", { type: "AGE", days: 1100 }],
+  ["Add 300 dependencies", { type: "DEPS", n: 300 }],
+  ["Remove the manifest", { type: "DEPS", n: null }],
+  ["Make the code tangled", { type: "COMPLEXITY", signal: { kind: "avg_cyclomatic", value: 24 } }],
+  ["Drop the complexity signal", { type: "COMPLEXITY", signal: null }],
+];
+
+document.getElementById("freeplay").innerHTML =
+  FREEPLAY.map((_, i) => `<button data-fp="${i}">${FREEPLAY[i][0]}</button>`).join("");
+document.getElementById("freeplay").addEventListener("click", e => {
+  const i = e.target.dataset.fp;
+  if (i !== undefined) dispatch(FREEPLAY[i][1], FREEPLAY[i][0] + ".");
+});
+
+const SCENARIOS = [
+  {
+    name: "The abandoned gem",
+    desc: `A genuinely excellent library — tests, CI, README, clean code — that nobody has touched
+           in three years. The formula can only see maintenance signals, not whether the code is
+           good. Watch for: does it fall far enough? A dependency that stopped being maintained is
+           a real risk, and the two commit measurements are only worth 20 points between them.`,
+    steps: [
+      ["Start from a well-kept library", { type: "PROFILE", key: "healthy" }],
+      ["Nobody commits for 6 months", { type: "AGE", days: 180 }],
+      ["Nobody commits for 3 years", { type: "AGE", days: 1100 }],
+      ["History shows it was never busy", { type: "COMMITS", n: 3 }],
+    ],
+  },
+  {
+    name: "The empty new repo",
+    desc: `Someone pushed an idea yesterday: no tests, no CI, no README, no dependencies declared.
+           It is maximally fresh and maximally empty. Watch for: the score starts low, but does
+           adding just a README move it more than it should? Presence checks are cheap to satisfy
+           and worth 50 points between them.`,
+    steps: [
+      ["Start from an empty new repo", { type: "PROFILE", key: "fresh_empty" }],
+      ["Author adds a README", { type: "TOGGLE_README" }],
+      ["Author adds a CI workflow", { type: "TOGGLE_CI" }],
+      ["Author adds one test file", { type: "TOGGLE_TESTS" }],
+    ],
+  },
+  {
+    name: "When we can't measure",
+    desc: `A healthy Go service. We have no Go complexity analyser and it declares no manifest we
+           parse, so two measurements worth 30 raw points simply vanish and the remaining five are
+           scaled up. Watch for: this repo can hit a high score without ever being measured on
+           code quality — is that the right call, or should unmeasurable count against it?`,
+    steps: [
+      ["Start from a Go service", { type: "PROFILE", key: "unmeasurable" }],
+      ["Confirm: no manifest to read", { type: "DEPS", n: null }],
+      ["Confirm: no complexity analyser", { type: "COMPLEXITY", signal: null }],
+      ["Now give it a bad complexity score", { type: "COMPLEXITY", signal: { kind: "avg_cyclomatic", value: 24 } }],
+    ],
+  },
+  {
+    name: "Busy but untested",
+    desc: `A sprawling JS monolith under constant active development — daily commits, CI, docs —
+           but no tests and tangled code. Watch for: the activity measurements reward it for being
+           busy. Does a heavily-committed, untested, complex codebase score higher than your
+           instinct says it should?`,
+    steps: [
+      ["Start from the JS monolith", { type: "PROFILE", key: "sprawling" }],
+      ["Confirm it's committed to daily", { type: "AGE", days: 0 }],
+      ["Now imagine tests were added", { type: "TOGGLE_TESTS" }],
+      ["And the code were untangled", { type: "COMPLEXITY", signal: { kind: "avg_cyclomatic", value: 4 } }],
+    ],
+  },
+];
+
+let activeTab = 0, stepIndex = 0;
+
+function renderTabs() {
+  document.getElementById("tabs").innerHTML = SCENARIOS.map((s, i) =>
+    `<button role="tab" aria-selected="${i === activeTab}" data-tab="${i}">${s.name}</button>`).join("");
+  const sc = SCENARIOS[activeTab];
+  document.getElementById("scenario-desc").textContent = sc.desc;
+  document.getElementById("steps").innerHTML = sc.steps.map(([label], i) => {
+    const cls = i < stepIndex ? "done" : i === stepIndex ? "active" : "";
+    return `<div class="step ${cls}">
+      <span class="step-n">${i + 1}</span>
+      <button data-step="${i}" ${i === stepIndex ? "" : "disabled"}>${label}</button>
+      <span class="step-label"></span>
+    </div>`;
+  }).join("");
+}
+
+document.getElementById("tabs").addEventListener("click", e => {
+  const i = e.target.dataset.tab;
+  if (i === undefined) return;
+  activeTab = +i; stepIndex = 0;
+  // Each walkthrough resets to a known repository so it runs the same way every time.
+  state = { ...PROFILES[SCENARIOS[activeTab].steps[0][1].key] };
+  prevScore = null;
+  renderTabs(); render("Walkthrough reset.");
+});
+
+document.getElementById("steps").addEventListener("click", e => {
+  const i = e.target.dataset.step;
+  if (i === undefined) return;
+  const [label, action] = SCENARIOS[activeTab].steps[+i];
+  stepIndex = +i + 1;
+  dispatch(action, label + ".");
+  renderTabs();
+});
+
+renderTabs();
+render();
+</script>
+</body>
+</html>

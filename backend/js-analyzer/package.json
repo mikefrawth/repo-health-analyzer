@@ -1,0 +1,11 @@
+{
+  "name": "repo-health-js-analyzer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned ESLint install used solely to compute the JS/TS Complexity Signal.",
+  "type": "module",
+  "dependencies": {
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0"
+  }
+}

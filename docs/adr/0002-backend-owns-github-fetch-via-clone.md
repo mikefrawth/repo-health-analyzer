@@ -1,0 +1,5 @@
+# Backend fetches the Target Repository directly via shallow clone
+
+The original spec had the Next.js API route fetch GitHub data (file tree, README, manifest, commits) and forward it to the FastAPI backend. We collapsed this: FastAPI fetches the Target Repository itself, via a shallow `git clone` (bounded depth) into a temp directory, rather than Next.js fetching and forwarding, and rather than the backend making per-file GitHub Contents API calls.
+
+Reasoning: splitting the fetch across both services duplicated "what data do we need" logic and put GitHub token handling in the layer that doesn't use the data. A clone also sidesteps GitHub's REST rate limits for file contents (a real constraint once Complexity Signal analysis needs to read many file bodies) and gives every analyzer — Metrics, Python and JS/TS Complexity Signals, commit recency — direct filesystem access instead of reimplementing content-fetching per analyzer. Trade-off: the backend's deploy environment must have `git` available and must clean up cloned directories; a repo-size check runs before cloning to bound disk usage.

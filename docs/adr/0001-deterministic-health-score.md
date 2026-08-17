@@ -1,0 +1,3 @@
+# Health Score is computed deterministically, not by the LLM
+
+The original spec had Claude return the 0–100 score alongside the qualitative summary. We changed this: the Health Score is now a fixed formula over Metrics, and Claude only ever produces the AI Summary (Strengths/Risks/Suggestions) text. Reasoning: a headline score that can drift between identical runs with no code change undermines the report's credibility and makes the scoring logic untestable. A deterministic formula is reproducible, unit-testable, and keeps the Health Score available even when the AI Summary step fails (see Partial Report).
