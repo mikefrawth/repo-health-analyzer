@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COMPONENTS,
   NOT_MEASURED,
+  componentScoreChartData,
   describeComplexity,
   formatDependencyCount,
   formatLastCommit,
   healthScoreBand,
   languageChartData,
 } from "@/lib/metrics-display";
-import type { ComplexitySignal } from "@/lib/report";
+import type { ComplexitySignal, ComponentScores } from "@/lib/report";
 
 describe("formatDependencyCount", () => {
   // The core distinction from user story 18: "we couldn't check" must never be
@@ -101,6 +103,56 @@ describe("languageChartData", () => {
   it("adds no Other bucket when everything already fits", () => {
     const data = languageChartData({ A: 2, B: 1 }, 5);
     expect(data.map((d) => d.language)).toEqual(["A", "B"]);
+  });
+});
+
+describe("componentScoreChartData", () => {
+  it("maps every weighted component to a row, in weight-table order", () => {
+    const scores: ComponentScores = {
+      tests: 1,
+      ci: 1,
+      readme: 1,
+      commit_recency: 1,
+      commit_activity: 1,
+      dependency_hygiene: 1,
+      complexity: 1,
+    };
+    const data = componentScoreChartData(scores);
+    expect(data.map((d) => d.key)).toEqual(Object.keys(COMPONENTS));
+    expect(data.every((d) => d.measured)).toBe(true);
+  });
+
+  it("scales a component's points by its weight and score", () => {
+    const data = componentScoreChartData({ tests: 0.5 } as ComponentScores);
+    const tests = data.find((d) => d.key === "tests");
+    expect(tests).toMatchObject({ points: COMPONENTS.tests.weight * 0.5, measured: true });
+  });
+
+  it("marks a component absent from the scores as unmeasured, never a zero score", () => {
+    const data = componentScoreChartData({} as ComponentScores);
+    const complexity = data.find((d) => d.key === "complexity");
+    // Unmeasured still gets a nonzero bar (its full weight) so it never renders
+    // as an empty/omitted slot — the muted styling is what marks it "not measured".
+    expect(complexity).toMatchObject({ measured: false, points: COMPONENTS.complexity.weight });
+
+    const scoredZero = componentScoreChartData({ complexity: 0 } as ComponentScores).find(
+      (d) => d.key === "complexity",
+    );
+    expect(scoredZero).toMatchObject({ measured: true, points: 0 });
+    expect(scoredZero?.points).not.toBe(complexity?.points);
+  });
+
+  it("gives every row a human-readable label", () => {
+    const data = componentScoreChartData({} as ComponentScores);
+    expect(data.map((d) => d.label)).toEqual([
+      "Tests",
+      "CI configuration",
+      "README",
+      "Commit recency",
+      "Commit activity",
+      "Dependency hygiene",
+      "Complexity",
+    ]);
   });
 });
 

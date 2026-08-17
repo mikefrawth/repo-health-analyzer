@@ -46,7 +46,11 @@ export default async function ReportPage({ params }: { params: { id: string } })
         <ScoreGauge score={report.health_score} />
       </header>
 
-      <MetricsPanel metrics={report.metrics} scope={report.analysis_scope} />
+      <MetricsPanel
+        metrics={report.metrics}
+        scope={report.analysis_scope}
+        componentScores={report.component_scores}
+      />
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">

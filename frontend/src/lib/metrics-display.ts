@@ -6,7 +6,7 @@
  * the two drift. This module only formats what the backend already decided.
  */
 
-import type { ComplexitySignal } from "./report";
+import type { ComplexitySignal, ComponentScores } from "./report";
 
 /**
  * Shown wherever a measurement could not be taken. Deliberately distinct from
@@ -84,6 +84,53 @@ export function languageChartData(
   const head = sorted.slice(0, limit);
   const tail = sorted.slice(limit).reduce((sum, entry) => sum + entry.files, 0);
   return tail > 0 ? [...head, { language: "Other", files: tail }] : head;
+}
+
+/**
+ * The Health Score formula's fixed weights and display labels
+ * (backend/app/scoring.py `WEIGHTS`), mirrored as data so the chart can show
+ * each component's share — no scoring logic is duplicated, only the
+ * published weight of an already-scored value (see ticket #9's note on
+ * ADR-0001). One table, keyed once, so a component can't drift out of sync
+ * between its weight and its label.
+ */
+export const COMPONENTS: Record<string, { label: string; weight: number }> = {
+  tests: { label: "Tests", weight: 20 },
+  ci: { label: "CI configuration", weight: 15 },
+  readme: { label: "README", weight: 15 },
+  commit_recency: { label: "Commit recency", weight: 12 },
+  commit_activity: { label: "Commit activity", weight: 8 },
+  dependency_hygiene: { label: "Dependency hygiene", weight: 10 },
+  complexity: { label: "Complexity", weight: 20 },
+};
+
+export type ComponentScoreDatum = {
+  key: string;
+  label: string;
+  /** The component's weighted contribution: weight × score. */
+  points: number;
+  /** False when the component has no Component Score at all — never a 0. */
+  measured: boolean;
+};
+
+/**
+ * Every weighted component as a chart row, always in the same order and never
+ * omitting one that's missing from `componentScores`. An unmeasured component
+ * gets its full weight as `points` (never zero) so its bar isn't mistaken for
+ * an empty slot — the caller must style `measured: false` rows distinctly so
+ * "not measured" is never confused with "scored zero" (CONTEXT.md).
+ */
+export function componentScoreChartData(componentScores: ComponentScores): ComponentScoreDatum[] {
+  return Object.entries(COMPONENTS).map(([key, { label, weight }]) => {
+    const score = componentScores[key];
+    const measured = score !== undefined;
+    return {
+      key,
+      label,
+      points: measured ? weight * score : weight,
+      measured,
+    };
+  });
 }
 
 export type HealthScoreBand = "strong" | "fair" | "weak" | "poor";

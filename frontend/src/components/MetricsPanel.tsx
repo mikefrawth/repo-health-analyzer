@@ -1,3 +1,4 @@
+import { ComponentScoreChart } from "@/components/ComponentScoreChart";
 import { LanguageChart } from "@/components/LanguageChart";
 import {
   NOT_MEASURED,
@@ -5,14 +6,16 @@ import {
   formatDependencyCount,
   formatLastCommit,
 } from "@/lib/metrics-display";
-import type { AnalysisScope, Metrics } from "@/lib/report";
+import type { AnalysisScope, ComponentScores, Metrics } from "@/lib/report";
 
 export function MetricsPanel({
   metrics,
   scope,
+  componentScores,
 }: {
   metrics: Metrics;
   scope: AnalysisScope;
+  componentScores: ComponentScores;
 }) {
   const complexity = describeComplexity(metrics.complexity);
 
@@ -20,12 +23,10 @@ export function MetricsPanel({
     <div className="space-y-6">
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Practices
+          Health Score contribution
         </h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <PracticeCheck label="Tests" present={metrics.has_tests} />
-          <PracticeCheck label="CI configuration" present={metrics.has_ci} />
-          <PracticeCheck label="README" present={metrics.has_readme} />
+        <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
+          <ComponentScoreChart componentScores={componentScores} />
         </div>
       </section>
 
@@ -84,29 +85,6 @@ export function MetricsPanel({
       </section>
 
       <ScopeDisclosure scope={scope} />
-    </div>
-  );
-}
-
-function PracticeCheck({ label, present }: { label: string; present: boolean }) {
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-xl border p-3 ${
-        present ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"
-      }`}
-    >
-      <span
-        aria-hidden
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
-          present ? "bg-emerald-500" : "bg-slate-300"
-        }`}
-      >
-        {present ? "✓" : "–"}
-      </span>
-      <span className="text-sm font-medium text-slate-700">
-        {label}
-        <span className="sr-only">{present ? " present" : " absent"}</span>
-      </span>
     </div>
   );
 }
