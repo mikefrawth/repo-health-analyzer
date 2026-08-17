@@ -75,11 +75,10 @@ Tests only exercise behavior through public seams — never internal call sequen
 
 **Prior art**: this is the first feature in the codebase, so the test structure above establishes the pattern — HTTP-level tests for orchestration and contract, pure-function tests for anything with an independently statable invariant — rather than following an existing convention.
 
-**Out of scope for this pass**: the JS/TS complexity path (`javascript_signal`) and the `radon`-backed Python path (`python_signal`) are not yet covered by tests against real fixture files — see Out of Scope below.
+**Complexity analyzer integration tests** (`backend/tests/test_complexity.py`, added after this spec's initial build pass): `python_signal` runs the real `radon` library against real Python fixture files (a simple function vs. a deliberately branchy one, plus a syntactically broken file to confirm it's skipped without dropping the rest of the signal). `javascript_signal` runs the real pinned ESLint install (via subprocess, no stubbing) against real JS and TS fixture files, pinning the parsed mean cyclomatic complexity against ESLint's actual reported values. The two ESLint-backed tests are skipped (not failed) when `backend/js-analyzer/node_modules` isn't present, matching `javascript_signal`'s own production fallback for an environment without the pinned install (`npm install` in `backend/js-analyzer` provisions it for local runs).
 
 ## Out of Scope
 
-- Complexity analyzer integration tests (`python_signal` against real Python fixtures via `radon`; `javascript_signal` against real JS/TS fixtures via the pinned ESLint install) — the analyzers are exercised only indirectly, via the confidence-cap and language-detection logic that consumes their output.
 - The Next.js frontend, the `/api/analyze` route, the Supabase schema and RLS policies, and the results UI — none of this exists yet in this build pass.
 - Deployment (Vercel/Railway/Render) and the associated Dockerfile validation beyond a written, unexecuted `backend/Dockerfile`.
 - Private repository support, GitHub OAuth, user accounts, and IP-based rate limiting — all explicitly deferred per the original project spec's "Then" section.
