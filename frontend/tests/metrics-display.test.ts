@@ -126,20 +126,38 @@ describe("componentScoreChartData", () => {
     const data = componentScoreChartData({ tests: 0.5 } as ComponentScores);
     const tests = data.find((d) => d.key === "tests");
     expect(tests).toMatchObject({ points: COMPONENTS.tests.weight * 0.5, measured: true });
+    // A measured component draws exactly what it contributes.
+    expect(tests?.barValue).toBe(tests?.points);
   });
 
-  it("marks a component absent from the scores as unmeasured, never a zero score", () => {
+  it("gives an unmeasured component no contribution, but still a visible bar", () => {
     const data = componentScoreChartData({} as ComponentScores);
     const complexity = data.find((d) => d.key === "complexity");
-    // Unmeasured still gets a nonzero bar (its full weight) so it never renders
-    // as an empty/omitted slot — the muted styling is what marks it "not measured".
-    expect(complexity).toMatchObject({ measured: false, points: COMPONENTS.complexity.weight });
 
+    // CONTEXT.md's Component Score entry: a component with no Component Score is
+    // dropped from the formula's renormalization, so it contributes nothing.
+    // Drawing it at its full weight read as a *perfect* score on that component.
+    expect(complexity).toMatchObject({ measured: false, points: 0 });
+
+    // Ticket #9 still requires it never render as an empty slot, so the bar is a
+    // short stub: visible, and too short to be mistaken for any real contribution.
+    const smallestWeight = Math.min(...Object.values(COMPONENTS).map((c) => c.weight));
+    expect(complexity?.barValue).toBeGreaterThan(0);
+    expect(complexity?.barValue).toBeLessThan(smallestWeight);
+  });
+
+  it("distinguishes an unmeasured component from one that genuinely scored zero", () => {
+    const unmeasured = componentScoreChartData({} as ComponentScores).find(
+      (d) => d.key === "complexity",
+    );
     const scoredZero = componentScoreChartData({ complexity: 0 } as ComponentScores).find(
       (d) => d.key === "complexity",
     );
-    expect(scoredZero).toMatchObject({ measured: true, points: 0 });
-    expect(scoredZero?.points).not.toBe(complexity?.points);
+
+    // Both contribute nothing — the difference is that one was measurable.
+    expect(scoredZero).toMatchObject({ measured: true, points: 0, barValue: 0 });
+    expect(scoredZero?.points).toBe(unmeasured?.points);
+    expect(scoredZero?.barValue).not.toBe(unmeasured?.barValue);
   });
 
   it("gives every row a human-readable label", () => {

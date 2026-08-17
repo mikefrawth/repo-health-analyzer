@@ -104,30 +104,50 @@ export const COMPONENTS: Record<string, { label: string; weight: number }> = {
   complexity: { label: "Complexity", weight: 20 },
 };
 
+/**
+ * How long an unmeasured component's bar is drawn, in the same units as
+ * `points`. Deliberately shorter than the smallest weight in `COMPONENTS`, so a
+ * stub can never be read as a real contribution — it exists only to keep the
+ * row visible.
+ */
+export const UNMEASURED_BAR_VALUE = 1;
+
 export type ComponentScoreDatum = {
   key: string;
   label: string;
-  /** The component's weighted contribution: weight × score. */
+  /**
+   * The component's weighted contribution: weight × score, and 0 when it has no
+   * Component Score — an unmeasured component is dropped from the formula's
+   * renormalization, so it contributes nothing (CONTEXT.md).
+   */
   points: number;
+  /**
+   * What the bar actually draws. Equal to `points`, except for an unmeasured
+   * component, which gets a short stub so its row never renders as an empty
+   * slot (ticket #9). Kept separate from `points` so the bar can stay visible
+   * without the number claiming a contribution that isn't there.
+   */
+  barValue: number;
   /** False when the component has no Component Score at all — never a 0. */
   measured: boolean;
 };
 
 /**
  * Every weighted component as a chart row, always in the same order and never
- * omitting one that's missing from `componentScores`. An unmeasured component
- * gets its full weight as `points` (never zero) so its bar isn't mistaken for
- * an empty slot — the caller must style `measured: false` rows distinctly so
- * "not measured" is never confused with "scored zero" (CONTEXT.md).
+ * omitting one that's missing from `componentScores`. The caller must style
+ * `measured: false` rows distinctly, so "not measured" is never confused with
+ * "scored zero" — the two carry the same `points` and differ only in `barValue`.
  */
 export function componentScoreChartData(componentScores: ComponentScores): ComponentScoreDatum[] {
   return Object.entries(COMPONENTS).map(([key, { label, weight }]) => {
     const score = componentScores[key];
     const measured = score !== undefined;
+    const points = measured ? weight * score : 0;
     return {
       key,
       label,
-      points: measured ? weight * score : weight,
+      points,
+      barValue: measured ? points : UNMEASURED_BAR_VALUE,
       measured,
     };
   });

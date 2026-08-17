@@ -11,7 +11,11 @@ import {
   YAxis,
 } from "recharts";
 
-import { COMPONENTS, componentScoreChartData } from "@/lib/metrics-display";
+import {
+  COMPONENTS,
+  componentScoreChartData,
+  type ComponentScoreDatum,
+} from "@/lib/metrics-display";
 import type { ComponentScores } from "@/lib/report";
 
 const MEASURED_FILL = "#1d4ed8";
@@ -63,18 +67,22 @@ export function ComponentScoreChart({ componentScores }: { componentScores: Comp
           />
           <Tooltip
             cursor={{ fill: "#f8fafc" }}
-            formatter={(value: number, _name, item) =>
-              item.payload.measured
-                ? [`${value.toFixed(1)} pts`, "Contribution"]
-                : ["Not measured", "Contribution"]
-            }
+            // Reads `points`, not the charted value: an unmeasured row draws a
+            // stub bar, and quoting that stub back as a number would be the
+            // very claim the stub exists to avoid making.
+            formatter={(_value: number, _name, item) => {
+              const datum = item.payload as ComponentScoreDatum;
+              return datum.measured
+                ? [datum.points.toFixed(1), "Weighted score"]
+                : ["Not measured", "Weighted score"];
+            }}
             contentStyle={{
               borderRadius: 8,
               border: "1px solid #e2e8f0",
               fontSize: 12,
             }}
           />
-          <Bar dataKey="points" radius={[0, 4, 4, 0]} maxBarSize={22}>
+          <Bar dataKey="barValue" radius={[0, 4, 4, 0]} maxBarSize={22}>
             {data.map((entry) => (
               <Cell
                 key={entry.key}
