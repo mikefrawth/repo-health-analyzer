@@ -27,31 +27,37 @@ export async function POST(request: Request): Promise<NextResponse> {
     return failure({ code: "invalid_url", message: INVALID_REPO_URL_MESSAGE });
   }
 
-  let result;
+  let analyzed;
   try {
-    result = await requestAnalysis(repoUrl);
+    analyzed = await requestAnalysis(repoUrl);
   } catch (error) {
-    // Misconfiguration (a missing env var) rather than a rejected repository.
+    // `requestAnalysis` answers an unreachable backend with `status: null`
+    // rather than throwing, so the only way out here is `requireEnv` — a missing
+    // PYTHON_BACKEND_URL or INTERNAL_API_SECRET. That's our deployment being
+    // wrong, not the service being down, and the two need different messages:
+    // "try again in a moment" is useless advice for an unset variable. 500 is
+    // the status that maps to `service_misconfigured`, which is the message we
+    // want; no response actually arrived.
     console.error("[analyze] could not call the backend:", error);
-    return failure(describeAnalyzeFailure(null));
+    return failure(describeAnalyzeFailure(500));
   }
 
-  if (!result.ok) {
-    const analyzeFailure = describeAnalyzeFailure(result.status, result.detail);
+  if (!analyzed.ok) {
+    const analyzeFailure = describeAnalyzeFailure(analyzed.status, analyzed.detail);
     if (analyzeFailure.code === "service_misconfigured" || analyzeFailure.code === "unknown") {
       // Every other code is a diagnosis the user can act on. These two are ours
       // to fix, and their backend detail is deliberately not shown to the user —
       // so it has to land somewhere the operator will see it.
       console.error(
-        `[analyze] backend returned ${result.status}:`,
-        result.detail ?? "(no detail)",
+        `[analyze] backend returned ${analyzed.status}:`,
+        analyzed.detail ?? "(no detail)",
       );
     }
     return failure(analyzeFailure);
   }
 
   try {
-    const id = await saveReport(result.data);
+    const id = await saveReport(analyzed.data);
     return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
     console.error("[analyze] analysis succeeded but the Report could not be saved:", error);

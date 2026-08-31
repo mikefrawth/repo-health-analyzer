@@ -23,10 +23,21 @@ export function MetricsPanel({
     <div className="space-y-6">
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Health Score contribution
+          Component Scores
         </h2>
         <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
           <ComponentScoreChart componentScores={componentScores} />
+          {/*
+            Not called a "contribution to the Health Score": the formula
+            renormalizes over the weight that could actually be measured and
+            then applies a confidence cap (ADR-0003), so these bars deliberately
+            don't sum to the Health Score shown above.
+          */}
+          <p className="mt-3 text-xs leading-snug text-slate-400">
+            Each component&rsquo;s weight × its Component Score. The Health Score
+            renormalizes these over what could be measured and caps the result, so
+            they don&rsquo;t add up to it directly.
+          </p>
         </div>
       </section>
 

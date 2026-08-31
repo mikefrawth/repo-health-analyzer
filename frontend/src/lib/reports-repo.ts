@@ -15,18 +15,18 @@ export type RecentReport = {
   created_at: string;
 };
 
-/** Persist a freshly-computed analysis as a Report and return its id. */
-export async function saveReport(analysis: AnalyzeResponse): Promise<string> {
+/** Persist a freshly-computed Report and return its id. */
+export async function saveReport(analyzed: AnalyzeResponse): Promise<string> {
   const { data, error } = await serviceRoleClient()
     .from(REPORTS_TABLE)
     .insert({
-      repo_url: analysis.repo_url,
-      metrics: analysis.metrics,
-      health_score: analysis.health_score,
-      analysis_scope: analysis.analysis_scope,
-      component_scores: analysis.component_scores,
+      repo_url: analyzed.repo_url,
+      metrics: analyzed.metrics,
+      health_score: analyzed.health_score,
+      analysis_scope: analyzed.analysis_scope,
+      component_scores: analyzed.component_scores,
       // Preserved as null for a Partial Report — a valid Report, not an error.
-      ai_summary: analysis.ai_summary,
+      ai_summary: analyzed.ai_summary,
     })
     .select("id")
     .single();
