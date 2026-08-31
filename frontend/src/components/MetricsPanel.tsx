@@ -6,16 +6,18 @@ import {
   formatDependencyCount,
   formatLastCommit,
 } from "@/lib/metrics-display";
-import type { AnalysisScope, ComponentScores, Metrics } from "@/lib/report";
+import type { AnalysisScope, ComponentScores, ComponentWeights, Metrics } from "@/lib/report";
 
 export function MetricsPanel({
   metrics,
   scope,
   componentScores,
+  componentWeights,
 }: {
   metrics: Metrics;
   scope: AnalysisScope;
   componentScores: ComponentScores;
+  componentWeights: ComponentWeights;
 }) {
   const complexity = describeComplexity(metrics.complexity);
 
@@ -26,7 +28,10 @@ export function MetricsPanel({
           Component Scores
         </h2>
         <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
-          <ComponentScoreChart componentScores={componentScores} />
+          <ComponentScoreChart
+            componentScores={componentScores}
+            componentWeights={componentWeights}
+          />
           {/*
             Not called a "contribution to the Health Score": the formula
             renormalizes over the weight that could actually be measured and

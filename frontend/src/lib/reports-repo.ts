@@ -25,6 +25,7 @@ export async function saveReport(analyzed: AnalyzeResponse): Promise<string> {
       health_score: analyzed.health_score,
       analysis_scope: analyzed.analysis_scope,
       component_scores: analyzed.component_scores,
+      component_weights: analyzed.component_weights,
       // Preserved as null for a Partial Report — a valid Report, not an error.
       ai_summary: analyzed.ai_summary,
     })
@@ -47,7 +48,7 @@ export async function fetchReport(id: string): Promise<Report | null> {
   const { data, error } = await publicClient()
     .from(REPORTS_TABLE)
     .select(
-      "id, repo_url, metrics, health_score, analysis_scope, component_scores, ai_summary, created_at",
+      "id, repo_url, metrics, health_score, analysis_scope, component_scores, component_weights, ai_summary, created_at",
     )
     .eq("id", id)
     .maybeSingle();

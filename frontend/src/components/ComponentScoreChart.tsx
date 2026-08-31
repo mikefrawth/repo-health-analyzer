@@ -11,19 +11,21 @@ import {
   YAxis,
 } from "recharts";
 
-import {
-  COMPONENTS,
-  componentScoreChartData,
-  type ComponentScoreDatum,
-} from "@/lib/metrics-display";
-import type { ComponentScores } from "@/lib/report";
+import { componentScoreChartData, type ComponentScoreDatum } from "@/lib/metrics-display";
+import type { ComponentScores, ComponentWeights } from "@/lib/report";
 
 const MEASURED_FILL = "#1d4ed8";
 const UNMEASURED_PATTERN_ID = "component-score-unmeasured-hatch";
-const MAX_WEIGHT = Math.max(...Object.values(COMPONENTS).map((c) => c.weight));
 
-export function ComponentScoreChart({ componentScores }: { componentScores: ComponentScores }) {
-  const data = componentScoreChartData(componentScores);
+export function ComponentScoreChart({
+  componentScores,
+  componentWeights,
+}: {
+  componentScores: ComponentScores;
+  componentWeights: ComponentWeights;
+}) {
+  const data = componentScoreChartData(componentScores, componentWeights);
+  const maxWeight = Math.max(...Object.values(componentWeights));
 
   return (
     <div style={{ height: Math.max(140, data.length * 38 + 30) }}>
@@ -51,7 +53,7 @@ export function ComponentScoreChart({ componentScores }: { componentScores: Comp
           <CartesianGrid horizontal={false} stroke="#f1f5f9" />
           <XAxis
             type="number"
-            domain={[0, MAX_WEIGHT]}
+            domain={[0, maxWeight]}
             allowDecimals={false}
             tick={{ fill: "#94a3b8", fontSize: 12 }}
             axisLine={false}

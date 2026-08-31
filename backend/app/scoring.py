@@ -10,9 +10,9 @@ Signal) are dropped and the remaining weights are renormalised, so an
 unmeasurable component neither helps nor hurts.
 """
 
-from .models import Metrics
+from .models import ComponentKey, Metrics
 
-WEIGHTS: dict[str, int] = {
+WEIGHTS: dict[ComponentKey, int] = {
     "tests": 20,
     "ci": 15,
     "readme": 15,
@@ -83,9 +83,9 @@ def _complexity(metrics: Metrics) -> float | None:
     return _lerp_down(signal.value, SIMPLE_CC, TANGLED_CC)
 
 
-def component_scores(metrics: Metrics) -> dict[str, float]:
+def component_scores(metrics: Metrics) -> dict[ComponentKey, float]:
     """Per-component scores in 0.0-1.0, omitting unmeasurable components."""
-    raw: dict[str, float | None] = {
+    raw: dict[ComponentKey, float | None] = {
         "tests": 1.0 if metrics.has_tests else 0.0,
         "ci": 1.0 if metrics.has_ci else 0.0,
         "readme": 1.0 if metrics.has_readme else 0.0,

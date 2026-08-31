@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  COMPONENTS,
+  COMPONENT_LABELS,
   NOT_MEASURED,
   componentScoreChartData,
   describeComplexity,
@@ -10,7 +10,20 @@ import {
   healthScoreBand,
   languageChartData,
 } from "@/lib/metrics-display";
-import type { ComplexitySignal, ComponentScores } from "@/lib/report";
+import type { ComplexitySignal, ComponentScores, ComponentWeights } from "@/lib/report";
+
+// Fixture weights standing in for the backend's `WEIGHTS`/`component_weights`,
+// exercising chart data purely against response-supplied numbers rather than
+// any value hardcoded in metrics-display.ts.
+const WEIGHTS: ComponentWeights = {
+  tests: 20,
+  ci: 15,
+  readme: 15,
+  commit_recency: 12,
+  commit_activity: 8,
+  dependency_hygiene: 10,
+  complexity: 20,
+};
 
 describe("formatDependencyCount", () => {
   // The core distinction from user story 18: "we couldn't check" must never be
@@ -117,21 +130,21 @@ describe("componentScoreChartData", () => {
       dependency_hygiene: 1,
       complexity: 1,
     };
-    const data = componentScoreChartData(scores);
-    expect(data.map((d) => d.key)).toEqual(Object.keys(COMPONENTS));
+    const data = componentScoreChartData(scores, WEIGHTS);
+    expect(data.map((d) => d.key)).toEqual(Object.keys(COMPONENT_LABELS));
     expect(data.every((d) => d.measured)).toBe(true);
   });
 
   it("scales a component's points by its weight and score", () => {
-    const data = componentScoreChartData({ tests: 0.5 } as ComponentScores);
+    const data = componentScoreChartData({ tests: 0.5 } as ComponentScores, WEIGHTS);
     const tests = data.find((d) => d.key === "tests");
-    expect(tests).toMatchObject({ points: COMPONENTS.tests.weight * 0.5, measured: true });
+    expect(tests).toMatchObject({ points: WEIGHTS.tests * 0.5, measured: true });
     // A measured component draws exactly what it contributes.
     expect(tests?.barValue).toBe(tests?.points);
   });
 
   it("gives an unmeasured component no contribution, but still a visible bar", () => {
-    const data = componentScoreChartData({} as ComponentScores);
+    const data = componentScoreChartData({} as ComponentScores, WEIGHTS);
     const complexity = data.find((d) => d.key === "complexity");
 
     // CONTEXT.md's Component Score entry: a component with no Component Score is
@@ -141,18 +154,19 @@ describe("componentScoreChartData", () => {
 
     // Ticket #9 still requires it never render as an empty slot, so the bar is a
     // short stub: visible, and too short to be mistaken for any real contribution.
-    const smallestWeight = Math.min(...Object.values(COMPONENTS).map((c) => c.weight));
+    const smallestWeight = Math.min(...Object.values(WEIGHTS));
     expect(complexity?.barValue).toBeGreaterThan(0);
     expect(complexity?.barValue).toBeLessThan(smallestWeight);
   });
 
   it("distinguishes an unmeasured component from one that genuinely scored zero", () => {
-    const unmeasured = componentScoreChartData({} as ComponentScores).find(
+    const unmeasured = componentScoreChartData({} as ComponentScores, WEIGHTS).find(
       (d) => d.key === "complexity",
     );
-    const scoredZero = componentScoreChartData({ complexity: 0 } as ComponentScores).find(
-      (d) => d.key === "complexity",
-    );
+    const scoredZero = componentScoreChartData(
+      { complexity: 0 } as ComponentScores,
+      WEIGHTS,
+    ).find((d) => d.key === "complexity");
 
     // Both contribute nothing — the difference is that one was measurable.
     expect(scoredZero).toMatchObject({ measured: true, points: 0, barValue: 0 });
@@ -161,7 +175,7 @@ describe("componentScoreChartData", () => {
   });
 
   it("gives every row a human-readable label", () => {
-    const data = componentScoreChartData({} as ComponentScores);
+    const data = componentScoreChartData({} as ComponentScores, WEIGHTS);
     expect(data.map((d) => d.label)).toEqual([
       "Tests",
       "CI configuration",
