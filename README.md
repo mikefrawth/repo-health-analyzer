@@ -128,9 +128,26 @@ Frontend typechecking:
 cd frontend && npm run typecheck
 ```
 
+## Deploying the backend
+
+The backend runs as the Docker image built from
+[`backend/Dockerfile`](backend/Dockerfile) — it needs `git` and `node` on
+PATH and a long-running process, which rules out Vercel's Python serverless
+runtime. [`render.yaml`](render.yaml) at the repo root is a Render Blueprint
+for it:
+
+1. Push this repo to GitHub and create a new Blueprint on
+   [render.com](https://render.com) pointing at it.
+2. Render builds `backend/Dockerfile` and creates a web service on the free
+   plan. Fill in `INTERNAL_API_SECRET`, `ANTHROPIC_API_KEY`, and `GITHUB_TOKEN`
+   in the service's Environment tab (marked `sync: false` in the blueprint so
+   they aren't stored in git).
+3. Point the frontend's `PYTHON_BACKEND_URL` at the Render service's URL.
+
+Deploy the frontend to Vercel as usual — it's a standard Next.js app.
+
 ## Not included in this build
 
-Deployment (Vercel/Railway/Render), private repository support, GitHub OAuth,
-user accounts, per-report privacy, and IP-based rate limiting are all out of
-scope — see the "Then" section of
+Private repository support, GitHub OAuth, user accounts, per-report privacy,
+and IP-based rate limiting are all out of scope — see the "Then" section of
 [`repo-health-analyzer-spec.md`](repo-health-analyzer-spec.md).
