@@ -42,3 +42,7 @@ The three fixed categories of qualitative observation that make up an AI Summary
 **Component Score**:
 One of the per-category 0.0–1.0 measurements (tests, CI, README, commit recency, commit activity, dependency hygiene, complexity) that the Health Score formula weights and combines. A component with no measurable value (e.g. no Complexity Signal) has no Component Score at all — never a `0.0` — and is dropped from the formula's renormalization rather than counted against the Target Repository.
 _Avoid_: metric score, sub-score, component metric
+
+**Component Weight**:
+The fixed integer weight the Health Score formula assigns to each of the seven Component Score categories, controlling how much that category contributes to the total. Always all seven keys — unlike Component Score, never dropped for an unmeasured category. Carried through `AnalyzeResponse` and stored on each Report row alongside its Component Scores, so a Report stays self-describing even if the formula is reweighted later. See [ADR-0006](docs/adr/0006-reports-table-includes-component-weights.md).
+_Avoid_: weight literal, formula weight
