@@ -50,6 +50,7 @@ export default async function ReportPage({ params }: { params: { id: string } })
         metrics={report.metrics}
         scope={report.analysis_scope}
         componentScores={report.component_scores}
+        componentWeights={report.component_weights}
       />
 
       <section className="space-y-4">

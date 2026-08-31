@@ -6,7 +6,7 @@
  * the two drift. This module only formats what the backend already decided.
  */
 
-import type { ComplexitySignal, ComponentScores } from "./report";
+import type { ComplexitySignal, ComponentKey, ComponentScores, ComponentWeights } from "./report";
 
 /**
  * Shown wherever a measurement could not be taken. Deliberately distinct from
@@ -87,33 +87,32 @@ export function languageChartData(
 }
 
 /**
- * The Health Score formula's fixed weights and display labels
- * (backend/app/scoring.py `WEIGHTS`), mirrored as data so the chart can show
- * each component's share — no scoring logic is duplicated, only the
- * published weight of an already-scored value (see ticket #9's note on
- * ADR-0001). One table, keyed once, so a component can't drift out of sync
- * between its weight and its label.
+ * Display labels for the Health Score formula's components, in the fixed
+ * order the chart renders them. Weights are no longer mirrored here — they
+ * ride the `AnalyzeResponse`/Report as `component_weights`, sourced from the
+ * backend's `WEIGHTS` table, so there is exactly one copy of the formula's
+ * weights (see ADR-0006).
  */
-export const COMPONENTS: Record<string, { label: string; weight: number }> = {
-  tests: { label: "Tests", weight: 20 },
-  ci: { label: "CI configuration", weight: 15 },
-  readme: { label: "README", weight: 15 },
-  commit_recency: { label: "Commit recency", weight: 12 },
-  commit_activity: { label: "Commit activity", weight: 8 },
-  dependency_hygiene: { label: "Dependency hygiene", weight: 10 },
-  complexity: { label: "Complexity", weight: 20 },
+export const COMPONENT_LABELS: Record<ComponentKey, string> = {
+  tests: "Tests",
+  ci: "CI configuration",
+  readme: "README",
+  commit_recency: "Commit recency",
+  commit_activity: "Commit activity",
+  dependency_hygiene: "Dependency hygiene",
+  complexity: "Complexity",
 };
 
 /**
  * How long an unmeasured component's bar is drawn, in the same units as
- * `points`. Deliberately shorter than the smallest weight in `COMPONENTS`, so a
- * stub can never be read as a real contribution — it exists only to keep the
- * row visible.
+ * `points`. Deliberately shorter than the smallest weight the backend ships,
+ * so a stub can never be read as a real contribution — it exists only to
+ * keep the row visible.
  */
 export const UNMEASURED_BAR_VALUE = 1;
 
 export type ComponentScoreDatum = {
-  key: string;
+  key: ComponentKey;
   label: string;
   /**
    * The component's weighted contribution: weight × score, and 0 when it has no
@@ -138,8 +137,13 @@ export type ComponentScoreDatum = {
  * `measured: false` rows distinctly, so "not measured" is never confused with
  * "scored zero" — the two carry the same `points` and differ only in `barValue`.
  */
-export function componentScoreChartData(componentScores: ComponentScores): ComponentScoreDatum[] {
-  return Object.entries(COMPONENTS).map(([key, { label, weight }]) => {
+export function componentScoreChartData(
+  componentScores: ComponentScores,
+  componentWeights: ComponentWeights,
+): ComponentScoreDatum[] {
+  return (Object.keys(COMPONENT_LABELS) as ComponentKey[]).map((key) => {
+    const label = COMPONENT_LABELS[key];
+    const weight = componentWeights[key];
     const score = componentScores[key];
     const measured = score !== undefined;
     const points = measured ? weight * score : 0;

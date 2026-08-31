@@ -63,9 +63,10 @@ python -m uvicorn app.main:app --reload --port 8000
 Check it: `curl http://127.0.0.1:8000/health` should return `{"status":"ok"}`.
 
 > The JS/TS Complexity Signal needs the pinned ESLint install. It's optional
-> locally — without it, JS/TS repositories simply get no Complexity Signal. To
-> enable it, run `npm install` in `backend/js-analyzer` and point
-> `JS_ANALYZER_DIR` at that directory.
+> for running the server locally — without it, JS/TS repositories simply get
+> no Complexity Signal. To enable it, run `npm install` in `backend/js-analyzer`
+> and point `JS_ANALYZER_DIR` at that directory. The test suite (below) needs
+> it too, to run the full `javascript_signal` coverage rather than skipping it.
 
 ## 3. Run the frontend
 
@@ -108,8 +109,14 @@ first: `https://github.com/octocat/Hello-World` analyzes in a couple of seconds.
 ## Tests
 
 ```bash
+npm ci --prefix backend/js-analyzer
 cd backend && python -m pytest
 ```
+
+The first line provisions the pinned ESLint install that `test_complexity.py`
+runs the `javascript_signal` tests against. Skip it and those two tests are
+skipped rather than failed — fine for a quick local run, but a fresh clone
+following this README gets the full, real-ESLint suite.
 
 ```bash
 cd frontend && npm test

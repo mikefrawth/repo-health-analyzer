@@ -44,10 +44,33 @@ export type AISummary = {
 };
 
 /**
+ * The seven categories the Health Score formula weights and combines
+ * (mirrors the backend's `app.models.ComponentKey`). A union rather than
+ * `string` so a typo'd or retired key fails typechecking instead of quietly
+ * drifting out of sync with the backend.
+ */
+export type ComponentKey =
+  | "tests"
+  | "ci"
+  | "readme"
+  | "commit_recency"
+  | "commit_activity"
+  | "dependency_hygiene"
+  | "complexity";
+
+/**
  * Per-component 0.0-1.0 scores that `health_score` was computed from. A
  * component absent here has no Component Score at all, per CONTEXT.md.
  */
-export type ComponentScores = Record<string, number>;
+export type ComponentScores = Partial<Record<ComponentKey, number>>;
+
+/**
+ * The fixed weight (out of 100) each component carries in the formula.
+ * Unfiltered — always all seven keys, unlike `ComponentScores`. Sourced from
+ * the backend response so no second, hand-mirrored copy of the weight table
+ * exists in the frontend (see ADR-0006).
+ */
+export type ComponentWeights = Record<ComponentKey, number>;
 
 /** The backend's `POST /analyze` response body. */
 export type AnalyzeResponse = {
@@ -56,6 +79,7 @@ export type AnalyzeResponse = {
   health_score: number;
   analysis_scope: AnalysisScope;
   component_scores: ComponentScores;
+  component_weights: ComponentWeights;
   /** `null` is a Partial Report — a complete, valid Report, not an error. */
   ai_summary: AISummary | null;
 };

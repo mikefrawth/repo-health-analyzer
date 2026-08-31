@@ -26,7 +26,7 @@ from .scope import (
     take_by_suffix,
     walk_repository,
 )
-from .scoring import component_scores, health_score
+from .scoring import WEIGHTS, component_scores, health_score
 
 logger = logging.getLogger(__name__)
 
@@ -94,5 +94,6 @@ async def analyze(repo_url: str, settings: Settings) -> AnalyzeResponse:
         health_score=score,
         analysis_scope=scope,
         component_scores=scores,
+        component_weights=WEIGHTS,
         ai_summary=summary,
     )
