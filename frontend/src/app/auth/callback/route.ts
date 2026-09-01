@@ -6,9 +6,9 @@
 
 import { NextResponse } from "next/server";
 
-import { githubProfileUpdate } from "@/lib/user-profile";
-import { serviceRoleClient } from "@/lib/supabase";
+import { githubProfileRow } from "@/lib/user-profile";
 import { serverClient } from "@/lib/supabase-server";
+import { saveGithubProfile } from "@/lib/user-profiles-repo";
 
 export async function GET(request: Request): Promise<NextResponse> {
   const { origin, searchParams } = new URL(request.url);
@@ -27,12 +27,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.redirect(`${origin}/?auth_error=exchange_failed`);
   }
 
-  const profile = githubProfileUpdate(data.session.user, data.session.provider_token ?? null);
-  const { error: upsertError } = await serviceRoleClient()
-    .from("user_profiles")
-    .upsert({ ...profile, updated_at: new Date().toISOString() });
-
-  if (upsertError) {
+  const profile = githubProfileRow(data.session.user, data.session.provider_token ?? null);
+  try {
+    await saveGithubProfile(profile);
+  } catch (upsertError) {
     // The session cookie is already set at this point, so the visitor is
     // still logged in — only the stored GitHub token/username is stale.
     // Logging in must not fail just because this write did.

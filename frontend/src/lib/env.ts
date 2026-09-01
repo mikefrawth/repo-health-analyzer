@@ -15,3 +15,8 @@ export function requireEnv(name: string): string {
   }
   return value;
 }
+
+/** The (url, anon key) pair every session-aware Supabase client needs. */
+export function supabaseSessionCredentials(): [url: string, anonKey: string] {
+  return [requireEnv("NEXT_PUBLIC_SUPABASE_URL"), requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")];
+}

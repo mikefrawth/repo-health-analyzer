@@ -13,7 +13,7 @@ export type AuthUser = {
   user_metadata: Record<string, unknown>;
 };
 
-export type GithubProfileUpdate = {
+export type GithubProfileRow = {
   id: string;
   github_username: string | null;
   github_token: string | null;
@@ -35,10 +35,10 @@ export function githubUsername(user: AuthUser): string | null {
  * later ticket requesting the private-repo scope has a value to widen instead
  * of inferring history from an unlabelled token.
  */
-export function githubProfileUpdate(
+export function githubProfileRow(
   user: AuthUser,
   providerToken: string | null,
-): GithubProfileUpdate {
+): GithubProfileRow {
   return {
     id: user.id,
     github_username: githubUsername(user),

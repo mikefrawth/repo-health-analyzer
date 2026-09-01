@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { githubProfileUpdate, githubUsername } from "@/lib/user-profile";
+import { githubProfileRow, githubUsername } from "@/lib/user-profile";
 import type { AuthUser } from "@/lib/user-profile";
 
 function makeUser(userMetadata: Record<string, unknown>): AuthUser {
@@ -35,10 +35,10 @@ describe("githubUsername", () => {
   });
 });
 
-describe("githubProfileUpdate", () => {
+describe("githubProfileRow", () => {
   it("carries the user id, username, and provider token through unchanged", () => {
     const user = makeUser({ user_name: "octocat" });
-    expect(githubProfileUpdate(user, "gho_abc123")).toEqual({
+    expect(githubProfileRow(user, "gho_abc123")).toEqual({
       id: user.id,
       github_username: "octocat",
       github_token: "gho_abc123",
@@ -53,7 +53,7 @@ describe("githubProfileUpdate", () => {
     // Can happen if Supabase's exchange succeeds but GitHub's response omits
     // the provider token — treated as no usable token rather than an error.
     const user = makeUser({ user_name: "octocat" });
-    expect(githubProfileUpdate(user, null)).toEqual({
+    expect(githubProfileRow(user, null)).toEqual({
       id: user.id,
       github_username: "octocat",
       github_token: null,

@@ -10,14 +10,13 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { requireEnv } from "./env";
+import { supabaseSessionCredentials } from "./env";
 
 export function serverClient(): SupabaseClient {
   const cookieStore = cookies();
 
   return createServerClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    ...supabaseSessionCredentials(),
     {
       cookies: {
         getAll() {
