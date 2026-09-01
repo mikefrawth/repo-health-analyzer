@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     claude_model: str = "claude-opus-5"
     claude_timeout_seconds: float = 60.0
 
+    # Daily per-IP cap on anonymous (no-login) analyze requests. A config
+    # knob, not a design decision — tune operationally without a code change.
+    anonymous_daily_request_limit: int = 20
+
 
 @lru_cache
 def get_settings() -> Settings:

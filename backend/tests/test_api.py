@@ -8,8 +8,9 @@ yields a Report.
 import pytest
 from app import analyzer
 from app.config import Settings, get_settings
-from app.main import app
+from app.main import app, get_request_counter
 from app.models import AISummary, AnalysisScope
+from app.rate_limit import RequestCounter
 from app.scoring import WEIGHTS, component_scores, health_score
 from conftest import make_metrics
 from fastapi.testclient import TestClient
@@ -112,6 +113,39 @@ def test_a_successful_summary_is_returned_alongside_the_metrics(
     assert body["ai_summary"]["risks"] == ["No test suite"]
     # The score is the formula's, unchanged by the summary's arrival.
     assert body["health_score"] == health_score(stub_repository)
+
+
+def test_a_request_under_the_daily_limit_is_allowed(client, stub_repository):
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        internal_api_secret=SECRET, anonymous_daily_request_limit=1
+    )
+    app.dependency_overrides[get_request_counter] = lambda: RequestCounter()
+
+    response = client.post(
+        "/analyze",
+        json={"repo_url": "https://github.com/owner/repo"},
+        headers={"X-Internal-Secret": SECRET, "X-Client-Ip": "1.2.3.4"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_a_request_over_the_daily_limit_is_rejected(client, stub_repository):
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        internal_api_secret=SECRET, anonymous_daily_request_limit=1
+    )
+    counter = RequestCounter()
+    counter.increment("1.2.3.4")
+    app.dependency_overrides[get_request_counter] = lambda: counter
+
+    response = client.post(
+        "/analyze",
+        json={"repo_url": "https://github.com/owner/repo"},
+        headers={"X-Internal-Secret": SECRET, "X-Client-Ip": "1.2.3.4"},
+    )
+
+    assert response.status_code == 429
+    assert response.json()["detail"]
 
 
 def test_an_invalid_url_is_reported_clearly(client):

@@ -29,7 +29,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let analyzed;
   try {
-    analyzed = await requestAnalysis(repoUrl);
+    analyzed = await requestAnalysis(repoUrl, clientIpFrom(request));
   } catch (error) {
     // `requestAnalysis` answers an unreachable backend with `status: null`
     // rather than throwing, so the only way out here is `requireEnv` — a missing
@@ -67,6 +67,19 @@ export async function POST(request: Request): Promise<NextResponse> {
         "We analyzed the repository but couldn't save the Report. Please try again.",
     });
   }
+}
+
+/**
+ * The visitor's IP as seen by our own edge, for the backend's per-IP rate
+ * limit. Vercel (and most proxies) put the original client first in
+ * `x-forwarded-for`; nothing upstream of us is trusted to have set this
+ * header honestly, but that's fine — worst case a spoofed value only lets
+ * that one request dodge its own rate limit, it can't affect anyone else's.
+ */
+function clientIpFrom(request: Request): string {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const first = forwardedFor?.split(",")[0]?.trim();
+  return first || "unknown";
 }
 
 async function readRepoUrl(request: Request): Promise<string> {

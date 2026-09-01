@@ -21,7 +21,10 @@ export type BackendResult =
  */
 const ANALYZE_TIMEOUT_MS = 180_000;
 
-export async function requestAnalysis(repoUrl: string): Promise<BackendResult> {
+export async function requestAnalysis(
+  repoUrl: string,
+  clientIp: string,
+): Promise<BackendResult> {
   const backendUrl = requireEnv("PYTHON_BACKEND_URL").replace(/\/+$/, "");
   const secret = requireEnv("INTERNAL_API_SECRET");
 
@@ -32,6 +35,11 @@ export async function requestAnalysis(repoUrl: string): Promise<BackendResult> {
       headers: {
         "Content-Type": "application/json",
         "X-Internal-Secret": secret,
+        // The backend is only ever called from here, never straight from a
+        // browser, so its own request.client is always this server's IP —
+        // it needs the visitor's IP handed to it explicitly to rate-limit
+        // per visitor rather than per (shared) Next.js egress IP.
+        "X-Client-Ip": clientIp,
       },
       body: JSON.stringify({ repo_url: repoUrl }),
       signal: AbortSignal.timeout(ANALYZE_TIMEOUT_MS),
