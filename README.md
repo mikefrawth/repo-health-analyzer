@@ -38,7 +38,24 @@ for the reasoning behind the architecture.
 3. From **Project Settings → API**, copy the project URL, the `anon` key, and
    the `service_role` key.
 
-## 2. Run the backend
+## 2. Set up GitHub OAuth login
+
+Login (added in #20) needs a GitHub OAuth App and Supabase's GitHub provider
+configured — both are external dashboard steps, not something a migration or
+env var can do for you. Run the interactive setup script from the repo root,
+which walks through both:
+
+```bash
+bash scripts/setup-github-oauth-supabase.sh
+```
+
+It opens each page, tells you exactly what to click/paste, and also covers
+adding a Vercel deployment's redirect URL once you have one — you only need
+to create the GitHub OAuth App once; re-run the script (or just revisit the
+Supabase Auth "URL Configuration" page it links to) to add a new environment
+later.
+
+## 3. Run the backend
 
 ```bash
 cd backend
@@ -68,7 +85,7 @@ Check it: `curl http://127.0.0.1:8000/health` should return `{"status":"ok"}`.
 > and point `JS_ANALYZER_DIR` at that directory. The test suite (below) needs
 > it too, to run the full `javascript_signal` coverage rather than skipping it.
 
-## 3. Run the frontend
+## 4. Run the frontend
 
 ```bash
 cd frontend
