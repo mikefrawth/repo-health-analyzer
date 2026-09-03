@@ -8,7 +8,7 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import { supabaseSessionCredentials } from "./env";
 
@@ -36,4 +36,12 @@ export function serverClient(): SupabaseClient {
       },
     },
   );
+}
+
+/** The signed-in visitor making this request, or `null` if there isn't one. */
+export async function currentUser(): Promise<User | null> {
+  const {
+    data: { user },
+  } = await serverClient().auth.getUser();
+  return user;
 }

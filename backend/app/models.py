@@ -93,3 +93,8 @@ class AnalyzeResponse(BaseModel):
     component_weights: dict[ComponentKey, int]
     # None means a Partial Report: Metrics succeeded, the AI Summary did not.
     ai_summary: AISummary | None = None
+    # Whether the Target Repository was private on GitHub at generation time.
+    # Recorded on the Report itself (issue #22) so the "a Report sourced from a
+    # private repo can never be made public" rule can be enforced downstream,
+    # independent of whether the repo's visibility later changes.
+    private: bool = False

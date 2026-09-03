@@ -10,5 +10,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // Runs against a real local Postgres/GoTrue stack (see
+    // vitest.integration.config.ts) — excluded from the fast default suite.
+    exclude: ["tests/integration/**", "node_modules/**"],
   },
 });

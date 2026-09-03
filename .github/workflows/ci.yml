@@ -66,3 +66,42 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  db:
+    name: Report visibility (Supabase RLS integration)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Applies frontend/supabase/migrations against a local Postgres +
+      # GoTrue stack and prints connection details for the test step below.
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Run RLS/constraint integration tests
+        run: |
+          eval "$(supabase status -o env | sed -e 's/^/export /')"
+          export SUPABASE_URL="$API_URL"
+          export SUPABASE_ANON_KEY="$ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          npm run test:integration
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop
