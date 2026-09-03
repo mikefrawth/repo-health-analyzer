@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { MetricsPanel } from "@/components/MetricsPanel";
+import { ReportVisibilityControl } from "@/components/ReportVisibilityControl";
 import { ScoreGauge } from "@/components/ScoreGauge";
 import { SummarySections } from "@/components/SummarySections";
 import { formatReportDate } from "@/lib/dates";
-import { isPartialReport } from "@/lib/report";
+import { canBeMadePublic, isPartialReport } from "@/lib/report";
 import { repoLabel } from "@/lib/repo-url";
 import { fetchReport } from "@/lib/reports-repo";
+import { serverClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,11 @@ export default async function ReportPage({ params }: { params: { id: string } })
   if (!report) {
     notFound();
   }
+
+  const {
+    data: { user },
+  } = await serverClient().auth.getUser();
+  const isOwner = user !== null && user.id === report.owner_id;
 
   return (
     <article className="space-y-8">
@@ -42,6 +49,13 @@ export default async function ReportPage({ params }: { params: { id: string } })
             Analyzed {formatReportDate(report.created_at)}
             {isPartialReport(report) ? " · Partial Report" : ""}
           </p>
+          {isOwner ? (
+            <ReportVisibilityControl
+              reportId={report.id}
+              isPublic={report.is_public}
+              canBeMadePublic={canBeMadePublic(report)}
+            />
+          ) : null}
         </div>
         <ScoreGauge score={report.health_score} />
       </header>

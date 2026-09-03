@@ -82,15 +82,34 @@ export type AnalyzeResponse = {
   component_weights: ComponentWeights;
   /** `null` is a Partial Report — a complete, valid Report, not an error. */
   ai_summary: AISummary | null;
+  /** Whether the Target Repository was private on GitHub at generation time. */
+  private: boolean;
 };
 
 /** A Report as stored in, and read back from, Supabase. */
 export type Report = AnalyzeResponse & {
   id: string;
   created_at: string;
+  /** `null` means an anonymously-generated Report — no owner, always public. */
+  owner_id: string | null;
+  /** Whether the Report is viewable by anyone with its link. */
+  is_public: boolean;
+  /** Renamed on the row from `AnalyzeResponse.private` for read-side clarity. */
+  source_repo_was_private: boolean;
 };
 
 /** A Report whose Metrics and Health Score survived but whose AI Summary did not. */
 export function isPartialReport(report: Pick<Report, "ai_summary">): boolean {
   return report.ai_summary === null;
+}
+
+/**
+ * Whether the "make public" toggle should even be shown for this Report. The
+ * database also enforces this (see migration 0005) — this pure function only
+ * drives the UI affordance, never the actual guarantee.
+ */
+export function canBeMadePublic(
+  report: Pick<Report, "is_public" | "source_repo_was_private">,
+): boolean {
+  return !report.is_public && !report.source_repo_was_private;
 }
