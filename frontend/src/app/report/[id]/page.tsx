@@ -9,7 +9,7 @@ import { formatReportDate } from "@/lib/dates";
 import { canBeMadePublic, isPartialReport } from "@/lib/report";
 import { repoLabel } from "@/lib/repo-url";
 import { fetchReport } from "@/lib/reports-repo";
-import { serverClient } from "@/lib/supabase-server";
+import { currentUser } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +19,7 @@ export default async function ReportPage({ params }: { params: { id: string } })
     notFound();
   }
 
-  const {
-    data: { user },
-  } = await serverClient().auth.getUser();
+  const user = await currentUser();
   const isOwner = user !== null && user.id === report.owner_id;
 
   return (

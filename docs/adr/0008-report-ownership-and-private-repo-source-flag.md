@@ -4,7 +4,9 @@ Issue #22 (part of the accounts/subscriptions epic, #19) needed a way for a sign
 
 ## Decision
 
-`reports` gains three columns (`frontend/supabase/migrations/0005_add_report_ownership.sql`): a nullable `owner_id` (references `auth.users(id)`, `on delete set null` so a deleted account doesn't cascade-delete its Reports), `is_public` (defaults `true`, matching the pre-#22 always-public behaviour, but written explicitly per-insert by application code — `false` when `owner_id` is set, `true` when it's `null`), and `source_repo_was_private` (recorded once, at generation time, from the GitHub API's own `private` field — the backend's `AnalyzeResponse.private`, `backend/app/models.py`).
+`reports` gains three columns (`frontend/supabase/migrations/0005_add_report_ownership.sql`): a nullable `owner_id` (references `auth.users(id)`, `on delete set null` so a deleted account doesn't cascade-delete its Reports), `is_public` (written explicitly per-insert by application code — `false` when `owner_id` is set, `true` when it's `null`), and `source_repo_was_private` (recorded once, at generation time, from the GitHub API's own `private` field — the backend's `AnalyzeResponse.private`, `backend/app/models.py`).
+
+`is_public`'s column default is added as `true` (so every pre-#22 row — all of them anonymous — backfills correctly as still-public) and then immediately flipped to `false` for all rows added from this point forward. Application code always sets it explicitly either way, so the default is a safety net, not something any current write path relies on — but it fails toward *private*, matching the acceptance criterion's "default private for owned Reports" as an unconditional guarantee rather than one that only holds as long as every future insert remembers to set the column.
 
 A check constraint, `reports_private_source_not_public`, makes `source_repo_was_private` and `is_public` mutually exclusive at the row level. Because it's a plain check constraint rather than a trigger, it fires on every `INSERT` and `UPDATE` — the exact two places a violation could otherwise sneak in — without needing separate trigger logic for each.
 

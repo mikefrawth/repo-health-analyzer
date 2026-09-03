@@ -12,10 +12,19 @@
 -- code — so no future code path, present or future, can leak a private
 -- repo's Report by making it public.
 
+-- `is_public` is added with a `true` default so every existing row — all of
+-- them anonymous Reports predating this migration — backfills correctly as
+-- still-public. The default then flips to `false` below, so any future
+-- insert that forgets to set it explicitly fails safe as private rather than
+-- accidentally public; every current write path (saveReport) sets it
+-- explicitly either way, so this is a safety net, not something app code
+-- relies on.
 alter table public.reports
   add column if not exists owner_id uuid references auth.users(id) on delete set null,
   add column if not exists is_public boolean not null default true,
   add column if not exists source_repo_was_private boolean not null default false;
+
+alter table public.reports alter column is_public set default false;
 
 alter table public.reports
   drop constraint if exists reports_private_source_not_public;

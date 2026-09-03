@@ -16,7 +16,7 @@ import {
 import { requestAnalysis } from "@/lib/backend";
 import { INVALID_REPO_URL_MESSAGE, parseRepoUrl } from "@/lib/repo-url";
 import { saveReport } from "@/lib/reports-repo";
-import { serverClient } from "@/lib/supabase-server";
+import { currentUser } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const {
-      data: { user },
-    } = await serverClient().auth.getUser();
+    const user = await currentUser();
     const id = await saveReport(analyzed.data, user?.id ?? null);
     return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
