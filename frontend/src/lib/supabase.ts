@@ -35,3 +35,5 @@ export function serviceRoleClient(): SupabaseClient {
 }
 
 export const REPORTS_TABLE = "reports";
+export const SUBSCRIPTIONS_TABLE = "subscriptions";
+export const CREDIT_LEDGER_TABLE = "credit_ledger";
