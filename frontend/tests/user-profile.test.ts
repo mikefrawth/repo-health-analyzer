@@ -60,4 +60,26 @@ describe("githubProfileRow", () => {
       github_token_scope: null,
     });
   });
+
+  it("labels the token with the private-repo scope when that's what was requested", () => {
+    // Issue #24's progressive-consent step: a later OAuth round trip can ask
+    // for more than ticket #20's default.
+    const user = makeUser({ user_name: "octocat" });
+    expect(githubProfileRow(user, "gho_abc123", "repo")).toEqual({
+      id: user.id,
+      github_username: "octocat",
+      github_token: "gho_abc123",
+      github_token_scope: "repo",
+    });
+  });
+
+  it("stores a null scope even for a widened request when there's no token to label", () => {
+    const user = makeUser({ user_name: "octocat" });
+    expect(githubProfileRow(user, null, "repo")).toEqual({
+      id: user.id,
+      github_username: "octocat",
+      github_token: null,
+      github_token_scope: null,
+    });
+  });
 });

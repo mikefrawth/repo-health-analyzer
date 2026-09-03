@@ -27,7 +27,15 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.redirect(`${origin}/?auth_error=exchange_failed`);
   }
 
-  const profile = githubProfileRow(data.session.user, data.session.provider_token ?? null);
+  // Which scope `/auth/login` actually asked GitHub for on this round trip
+  // (issue #24) — round-tripped through the callback URL's own query string,
+  // since Supabase's session doesn't otherwise expose it.
+  const requestedScope = searchParams.get("scope") === "private" ? "repo" : "public";
+  const profile = githubProfileRow(
+    data.session.user,
+    data.session.provider_token ?? null,
+    requestedScope,
+  );
   try {
     await saveGithubProfile(profile);
   } catch (upsertError) {

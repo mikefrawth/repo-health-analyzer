@@ -70,7 +70,10 @@ def require_under_rate_limit(
 
 @app.exception_handler(AnalysisError)
 async def analysis_error_handler(_request: Request, exc: AnalysisError) -> JSONResponse:
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+    content: dict[str, str] = {"detail": exc.message}
+    if exc.code:
+        content["code"] = exc.code
+    return JSONResponse(status_code=exc.status_code, content=content)
 
 
 @app.get("/health")
@@ -87,4 +90,9 @@ async def analyze_repository(
     payload: AnalyzeRequest,
     settings: Settings = Depends(get_settings),
 ) -> AnalyzeResponse:
-    return await analyze(payload.repo_url, settings)
+    return await analyze(
+        payload.repo_url,
+        settings,
+        user_github_token=payload.github_token,
+        user_github_token_scope=payload.github_token_scope,
+    )

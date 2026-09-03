@@ -10,6 +10,12 @@ from pydantic import BaseModel, Field
 
 class AnalyzeRequest(BaseModel):
     repo_url: str
+    # Issue #24: the signed-in requester's own GitHub OAuth token and its
+    # granted scope, when there is one — forwarded by the frontend, which
+    # owns the session. Absent for anonymous requests, which always use the
+    # server's fallback token.
+    github_token: str | None = None
+    github_token_scope: Literal["public", "repo"] | None = None
 
 
 # The seven categories the Health Score formula weights and combines (see

@@ -62,7 +62,7 @@ def stub_repository(monkeypatch):
     async def fake_metadata(owner, repo, token):
         return {"size": 1_000, "private": False}
 
-    def fake_measure(owner, repo, settings):
+    def fake_measure(owner, repo, settings, token=""):
         return metrics, scope
 
     monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
@@ -107,7 +107,7 @@ def test_a_private_source_repository_is_flagged_as_such(client, monkeypatch):
     async def fake_metadata(owner, repo, token):
         return {"size": 1_000, "private": True}
 
-    def fake_measure(owner, repo, settings):
+    def fake_measure(owner, repo, settings, token=""):
         return metrics, scope
 
     monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
@@ -121,6 +121,110 @@ def test_a_private_source_repository_is_flagged_as_such(client, monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["private"] is True
+    # Issue #24: a private-repo Report is quantitative-only in v1 — no
+    # AI Summary is even attempted, regardless of whether Claude is configured.
+    assert response.json()["ai_summary"] is None
+
+
+def test_a_users_own_token_is_preferred_over_the_server_fallback(client, monkeypatch):
+    """Issue #24: a signed-in user's token is used when they have one."""
+    metrics = make_metrics()
+    scope = AnalysisScope(
+        total_files_seen=1,
+        files_analyzed=1,
+        truncated=False,
+        python_files_analyzed=1,
+        js_files_analyzed=0,
+    )
+    seen_tokens = []
+
+    async def fake_metadata(owner, repo, token):
+        seen_tokens.append(token)
+        return {"size": 1_000, "private": False}
+
+    def fake_measure(owner, repo, settings, token=""):
+        return metrics, scope
+
+    monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
+    monkeypatch.setattr(analyzer, "_measure_clone", fake_measure)
+
+    response = client.post(
+        "/analyze",
+        json={
+            "repo_url": "https://github.com/owner/repo",
+            "github_token": "users-own-token",
+            "github_token_scope": "public",
+        },
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    assert response.status_code == 200
+    assert seen_tokens == ["users-own-token"]
+
+
+def test_a_404_for_a_public_scope_user_prompts_for_private_access(client, monkeypatch):
+    """Issue #24: can't tell "missing" from "private and inaccessible" with
+    only public scope, so the user is asked to grant more access."""
+    from app.errors import AnalysisError
+
+    async def fake_metadata(owner, repo, token):
+        raise AnalysisError("No repository found.", status_code=404)
+
+    monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
+
+    response = client.post(
+        "/analyze",
+        json={
+            "repo_url": "https://github.com/owner/repo",
+            "github_token": "users-own-token",
+            "github_token_scope": "public",
+        },
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "needs_private_scope"
+
+
+def test_a_404_for_an_anonymous_request_is_a_plain_not_found(client, monkeypatch):
+    from app.errors import AnalysisError
+
+    async def fake_metadata(owner, repo, token):
+        raise AnalysisError("No repository found.", status_code=404)
+
+    monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
+
+    response = client.post(
+        "/analyze",
+        json={"repo_url": "https://github.com/owner/repo"},
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    assert response.status_code == 404
+    assert "code" not in response.json()
+
+
+def test_a_404_for_a_repo_scope_user_is_a_plain_not_found(client, monkeypatch):
+    """Already has private-repo access; a 404 really does mean not found."""
+    from app.errors import AnalysisError
+
+    async def fake_metadata(owner, repo, token):
+        raise AnalysisError("No repository found.", status_code=404)
+
+    monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
+
+    response = client.post(
+        "/analyze",
+        json={
+            "repo_url": "https://github.com/owner/repo",
+            "github_token": "users-own-token",
+            "github_token_scope": "repo",
+        },
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    assert response.status_code == 404
+    assert "code" not in response.json()
 
 
 def test_a_successful_summary_is_returned_alongside_the_metrics(

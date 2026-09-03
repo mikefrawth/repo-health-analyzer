@@ -13,6 +13,7 @@ import { INVALID_REPO_URL_MESSAGE } from "./repo-url";
 export const ANALYZE_ERROR_CODES = [
   "invalid_url",
   "not_found",
+  "needs_private_scope",
   "rate_limited",
   "too_large",
   "upstream_failed",
@@ -33,8 +34,11 @@ const DEFAULT_MESSAGES: Record<AnalyzeErrorCode, string> = {
   // sentence whether we caught it or the backend did.
   invalid_url: INVALID_REPO_URL_MESSAGE,
   not_found:
-    "We couldn't find that repository. It may be private, renamed, or the owner " +
-    "and name may be misspelled — this build can only analyze public repositories.",
+    "We couldn't find that repository. It may not exist, be misspelled, or be " +
+    "private — log in to analyze your own private repositories.",
+  needs_private_scope:
+    "This may be a private repository. Grant access to your private GitHub " +
+    "repositories to try again.",
   rate_limited:
     "GitHub is rate-limiting us right now. Wait a few minutes and try again.",
   too_large:
@@ -80,6 +84,10 @@ function codeForStatus(status: number | null): AnalyzeErrorCode {
 const HTTP_STATUSES: Record<AnalyzeErrorCode, number> = {
   invalid_url: 400,
   not_found: 404,
+  // Distinct from a plain 404: the repo may well exist, just not visibly to
+  // the requester's current token — 403 ("more permission would help") reads
+  // more accurately than repeating the backend's ambiguous 404.
+  needs_private_scope: 403,
   too_large: 413,
   rate_limited: 429,
   upstream_failed: 502,
@@ -98,12 +106,17 @@ export function httpStatusFor(code: AnalyzeErrorCode): number {
 /**
  * `status` is the backend's HTTP status, or `null` when no response arrived at
  * all. `detail` is the backend's `{"detail": ...}` message, when there was one.
+ * `backendCode` is the backend's own `{"code": ...}` (`AnalysisError.code` in
+ * backend/app/errors.py), for the handful of failures a bare HTTP status
+ * can't distinguish — e.g. `needs_private_scope` is still a 404 on the wire.
  */
 export function describeAnalyzeFailure(
   status: number | null,
   detail?: string | null,
+  backendCode?: string | null,
 ): AnalyzeFailure {
-  const code = codeForStatus(status);
+  const code =
+    backendCode === "needs_private_scope" ? "needs_private_scope" : codeForStatus(status);
   // Two cases where the backend's own words are the wrong thing to show: there
   // was no response to quote, or the detail describes our deployment rather
   // than anything the reader did ("Invalid or missing internal secret.").

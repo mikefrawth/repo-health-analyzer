@@ -13,10 +13,11 @@ import {
   httpStatusFor,
   type AnalyzeFailure,
 } from "@/lib/analyze-errors";
-import { requestAnalysis } from "@/lib/backend";
+import { requestAnalysis, type RequesterToken } from "@/lib/backend";
 import { INVALID_REPO_URL_MESSAGE, parseRepoUrl } from "@/lib/repo-url";
 import { saveReport } from "@/lib/reports-repo";
 import { currentUser } from "@/lib/supabase-server";
+import { fetchGithubProfile } from "@/lib/user-profiles-repo";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     return failure({ code: "invalid_url", message: INVALID_REPO_URL_MESSAGE });
   }
 
+  const user = await currentUser();
+  const requesterToken = user ? await requesterTokenFor(user.id) : null;
+
   let analyzed;
   try {
-    analyzed = await requestAnalysis(repoUrl, clientIpFrom(request));
+    analyzed = await requestAnalysis(repoUrl, clientIpFrom(request), requesterToken);
   } catch (error) {
     // `requestAnalysis` answers an unreachable backend with `status: null`
     // rather than throwing, so the only way out here is `requireEnv` — a missing
@@ -44,7 +48,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   if (!analyzed.ok) {
-    const analyzeFailure = describeAnalyzeFailure(analyzed.status, analyzed.detail);
+    const analyzeFailure = describeAnalyzeFailure(
+      analyzed.status,
+      analyzed.detail,
+      analyzed.code,
+    );
     if (analyzeFailure.code === "service_misconfigured" || analyzeFailure.code === "unknown") {
       // Every other code is a diagnosis the user can act on. These two are ours
       // to fix, and their backend detail is deliberately not shown to the user —
@@ -58,7 +66,6 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const user = await currentUser();
     const id = await saveReport(analyzed.data, user?.id ?? null);
     return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
@@ -82,6 +89,25 @@ function clientIpFrom(request: Request): string {
   const forwardedFor = request.headers.get("x-forwarded-for");
   const first = forwardedFor?.split(",")[0]?.trim();
   return first || "unknown";
+}
+
+/**
+ * Issue #24: the signed-in requester's own stored GitHub token, if they have
+ * a usable one. A profile row failing to load isn't fatal to analysis —
+ * it just means this request falls back to the server's shared token, same
+ * as an anonymous one.
+ */
+async function requesterTokenFor(userId: string): Promise<RequesterToken | null> {
+  try {
+    const profile = await fetchGithubProfile(userId);
+    if (!profile?.github_token || !profile.github_token_scope) {
+      return null;
+    }
+    return { token: profile.github_token, scope: profile.github_token_scope };
+  } catch (error) {
+    console.error("[analyze] could not load the signed-in user's GitHub profile:", error);
+    return null;
+  }
 }
 
 async function readRepoUrl(request: Request): Promise<string> {
