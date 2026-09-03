@@ -5,7 +5,9 @@ Analyzes a public GitHub repository and produces a saved, shareable Report combi
 ## Language
 
 **Target Repository**:
-The public GitHub repository a user submits for analysis, identified by its URL.
+The GitHub repository a user submits for analysis, identified by its URL. Public
+by default; a signed-in user may also submit one of their own private
+repositories (issue #24), analyzed with their own OAuth token.
 _Avoid_: Repo (too ambiguous with this project's own repo), project, codebase
 
 **Report**:

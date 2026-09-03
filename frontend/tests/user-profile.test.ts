@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { githubProfileRow, githubUsername } from "@/lib/user-profile";
+import { githubProfileRow, githubUsername, widestScope } from "@/lib/user-profile";
 import type { AuthUser } from "@/lib/user-profile";
 
 function makeUser(userMetadata: Record<string, unknown>): AuthUser {
@@ -81,5 +81,30 @@ describe("githubProfileRow", () => {
       github_token: null,
       github_token_scope: null,
     });
+  });
+});
+
+describe("widestScope", () => {
+  it("keeps repo scope even when the newer request only asked for public", () => {
+    // A routine re-login (session expiry, sign out/in) must not un-grant
+    // private-repo access this user already gave on an earlier round trip.
+    expect(widestScope("repo", "public")).toBe("repo");
+  });
+
+  it("keeps repo scope regardless of which side it's on", () => {
+    expect(widestScope("public", "repo")).toBe("repo");
+  });
+
+  it("stays public when neither side has ever had repo scope", () => {
+    expect(widestScope("public", "public")).toBe("public");
+  });
+
+  it("treats a never-stored scope as no constraint", () => {
+    expect(widestScope(null, "public")).toBe("public");
+    expect(widestScope("repo", null)).toBe("repo");
+  });
+
+  it("is null only when neither side has ever had a token at all", () => {
+    expect(widestScope(null, null)).toBeNull();
   });
 });
