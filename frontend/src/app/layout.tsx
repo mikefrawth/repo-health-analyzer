@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import "./globals.css";
+import { AuthControls } from "@/components/AuthControls";
+import { githubUsername } from "@/lib/user-profile";
+import { serverClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
   title: "Repo Health Analyzer",
@@ -10,7 +13,11 @@ export const metadata: Metadata = {
     "the Metrics behind it, and a plain-language summary.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const {
+    data: { user },
+  } = await serverClient().auth.getUser();
+
   return (
     <html lang="en">
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
@@ -19,14 +26,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="text-sm font-semibold tracking-tight">
               Repo Health Analyzer
             </Link>
-            <a
-              href="https://github.com/mikefrawth/repo-health-analyzer"
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-slate-500 transition-colors hover:text-slate-900"
-            >
-              Source
-            </a>
+            <div className="flex items-center gap-6">
+              <a
+                href="https://github.com/mikefrawth/repo-health-analyzer"
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm text-slate-500 transition-colors hover:text-slate-900"
+              >
+                Source
+              </a>
+              <AuthControls githubUsername={user ? githubUsername(user) : null} />
+            </div>
           </div>
         </header>
         <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>
