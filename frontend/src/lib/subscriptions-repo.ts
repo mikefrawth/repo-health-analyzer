@@ -8,12 +8,9 @@
  * (migration 0006).
  */
 
-import { serviceRoleClient } from "./supabase";
+import { CREDIT_LEDGER_TABLE, SUBSCRIPTIONS_TABLE, serviceRoleClient } from "./supabase";
 import { serverClient } from "./supabase-server";
 import type { LedgerEntry, SubscriptionStatus } from "./subscription";
-
-export const SUBSCRIPTIONS_TABLE = "subscriptions";
-export const CREDIT_LEDGER_TABLE = "credit_ledger";
 
 export type SubscriptionRow = {
   status: SubscriptionStatus;

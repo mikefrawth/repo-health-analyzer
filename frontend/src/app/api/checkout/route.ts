@@ -20,22 +20,28 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.redirect(`${origin}/auth/login`);
   }
 
-  const session = await stripeClient().checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price: requireEnv("STRIPE_PRICE_ID"), quantity: 1 }],
-    // The webhook's only way to attribute a completed checkout back to a
-    // signed-in user -- see stripe-webhook.ts's handleCheckoutSessionCompleted.
-    client_reference_id: user.id,
-    customer_email: user.email ?? undefined,
-    success_url: `${origin}/?checkout=success`,
-    cancel_url: `${origin}/?checkout=canceled`,
-  });
+  let sessionUrl: string | null;
+  try {
+    const session = await stripeClient().checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: requireEnv("STRIPE_PRICE_ID"), quantity: 1 }],
+      // The webhook's only way to attribute a completed checkout back to a
+      // signed-in user -- see stripe-webhook.ts's handleCheckoutSessionCompleted.
+      client_reference_id: user.id,
+      customer_email: user.email ?? undefined,
+      success_url: `${origin}/?checkout=success`,
+      cancel_url: `${origin}/?checkout=canceled`,
+    });
+    sessionUrl = session.url;
+  } catch (err) {
+    console.error("[api/checkout] could not create a Checkout session:", err);
+    sessionUrl = null;
+  }
 
-  if (!session.url) {
-    console.error("[api/checkout] Stripe did not return a Checkout URL");
+  if (!sessionUrl) {
     return NextResponse.redirect(`${origin}/?checkout=error`);
   }
 
   // 303: the browser's follow-up request must be a GET, not a repeat POST.
-  return NextResponse.redirect(session.url, { status: 303 });
+  return NextResponse.redirect(sessionUrl, { status: 303 });
 }
