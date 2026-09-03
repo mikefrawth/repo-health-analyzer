@@ -3,8 +3,15 @@ import Link from "next/link";
 
 import "./globals.css";
 import { AuthControls } from "@/components/AuthControls";
+import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { githubUsername } from "@/lib/user-profile";
 import { serverClient } from "@/lib/supabase-server";
+import { creditBalance } from "@/lib/subscription";
+import {
+  fetchOwnLedgerForPeriod,
+  fetchOwnSubscription,
+  type SubscriptionRow,
+} from "@/lib/subscriptions-repo";
 
 export const metadata: Metadata = {
   title: "Repo Health Analyzer",
@@ -17,6 +24,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const {
     data: { user },
   } = await serverClient().auth.getUser();
+
+  let subscription: SubscriptionRow | null = null;
+  let balance: number | null = null;
+  if (user) {
+    subscription = await fetchOwnSubscription();
+    if (subscription?.status === "active") {
+      const ledger = await fetchOwnLedgerForPeriod(subscription.current_period_start);
+      balance = creditBalance(ledger, subscription.current_period_start);
+    }
+  }
 
   return (
     <html lang="en">
@@ -35,6 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               >
                 Source
               </a>
+              {user && <SubscriptionStatus status={subscription?.status ?? null} balance={balance} />}
               <AuthControls githubUsername={user ? githubUsername(user) : null} />
             </div>
           </div>

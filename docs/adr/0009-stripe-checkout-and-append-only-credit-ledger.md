@@ -1,0 +1,38 @@
+# Stripe Checkout for the single subscription tier, credits as an append-only ledger
+
+Issue #23 (part of the accounts/subscriptions epic, #19) needed a logged-in user to subscribe to the app's single paid tier and see a credit balance that a Stripe webhook — never the client — grants and updates. This ticket is deliberately the standalone "I can pay and see my credit balance" slice: it does not touch the analyze flow (that's #25).
+
+## Decision
+
+**Payment provider.** Stripe Checkout + Billing, as ADR-worthy groundwork the ticket itself already named as the conventional choice for a Supabase-backed app with no alternative specified. `/api/checkout` (`frontend/src/app/api/checkout/route.ts`) is a POST-only route, following the same low-JS form-POST pattern as `/auth/signout` and the report visibility toggle: it resolves the signed-in user server-side, creates a Stripe Checkout Session in `subscription` mode with `client_reference_id` set to the Supabase user id, and redirects to Stripe's hosted page. It does nothing else — no subscription or credit state changes until the webhook confirms payment.
+
+**Schema** (`frontend/supabase/migrations/0006_add_subscriptions_and_credits.sql`): two new tables, mirroring `reports`/`user_profiles`'s existing split of "service-role writes, owner-only reads via RLS."
+- `subscriptions`: one row per user (`user_id` unique), carrying `stripe_customer_id`, `stripe_subscription_id` (also unique — the webhook's upsert key), `status` (`active`/`canceled`/`past_due`), and the current billing period's start/end.
+- `credit_ledger`: an **append-only** table — one row per grant/consume/refund event, tagged with a `reason` and the billing period it belongs to, rather than a single mutable counter. The current balance is derived by summing a period's rows (`creditBalance()`, `frontend/src/lib/subscription.ts`) instead of being stored anywhere directly, so a refund (#25) is just another row, never a retroactive edit — and the history stays auditable by construction.
+
+Both tables enable RLS with a `select`-only policy scoped to `auth.uid()`; there is no insert/update/delete policy for any role but the service role, exactly like `user_profiles`.
+
+**Webhook idempotency.** Stripe can (and does) redeliver events, and a new subscription's first `invoice.paid` fires alongside `checkout.session.completed` for the *same* billing period — both paths grant credits. Rather than have application code reason about which event "owns" the grant, a partial unique index (`credit_ledger_one_monthly_grant_per_period_idx`, on `(user_id, billing_period_start) where reason = 'monthly_grant'`) makes a second grant for a period impossible at the database level. `grantMonthlyCredits()` (`subscriptions-repo.ts`) catches the resulting `23505` unique-violation and treats it as a no-op, the same pattern `reports-repo.ts` already uses for `23514` check-violations.
+
+**Webhook handler as a pure(ish) dispatcher over injected dependencies.** `handleStripeEvent()` (`frontend/src/lib/stripe-webhook.ts`) takes a parsed `Stripe.Event` and a `StripeWebhookDeps` object — this repo's existing explicit-dependency-boundary convention (mirroring the backend's `fetch_repo_metadata`/`generate_summary` mocking). The route handler (`/api/stripe/webhook`) does only two things beyond that: verify the raw body's signature with `STRIPE_WEBHOOK_SECRET`, and call `handleStripeEvent(event, liveWebhookDeps())`. `getSubscriptionPeriod` is the one *live* dependency — a Checkout Session webhook payload doesn't carry the subscription's period dates, so linking a freshly-completed checkout to its billing period needs one real Stripe API call. Every other handled event (`invoice.paid`, `customer.subscription.updated/deleted`, `invoice.payment_failed`) carries what it needs directly on its own payload, so no further live calls are needed there. Tests drive `handleStripeEvent` directly with synthetic, schema-valid event objects and fake dependencies (`vi.fn()`) — no live Stripe call anywhere in the test suite, per the ticket's testing decisions.
+
+**Status mapping.** Stripe's subscription status has more values than this app tracks. `trialing` is folded into `active` (v1 has no separate trial handling); `unpaid` folds into `past_due` (a potentially-recoverable failed payment); everything else (`incomplete`, `incomplete_expired`, `canceled`) folds into `canceled`.
+
+**Credit amount as a config knob, not a constant.** `monthlyCreditAmount()` reads `STRIPE_MONTHLY_CREDITS`, defaulting to 20 for local dev/test. The ticket explicitly scopes "the actual subscription price and monthly credit count" as a business decision, not an engineering one — a env var means changing it needs no code change or deploy.
+
+**UI.** `SubscriptionStatus` (`frontend/src/components/SubscriptionStatus.tsx`) is pure presentation, wired into `layout.tsx` next to `AuthControls` and shown only when a user is signed in: a "Subscribe" form-POST button when there's no active subscription, or `"N credits left"` — computed by `creditBalance()` from the current period's ledger rows — when there is.
+
+## Alternatives considered
+
+**Grant credits only from `invoice.paid`, treat `checkout.session.completed` as pure account linking.** Considered, to avoid needing the idempotency guard at all. Rejected: `checkout.session.completed` is the only event carrying `client_reference_id` (the Supabase user id) — without granting there too, the very first period's credits would depend on `invoice.paid` correctly resolving a `subscriptions` row that only `checkout.session.completed` had a chance to create moments earlier, adding an ordering dependency between two independently-delivered webhook events instead of just deduplicating at the database.
+
+**Application-code idempotency (check-then-insert) instead of a database constraint.** Rejected for the same reason ADR-0008 rejected pure application-code enforcement of the ownership rule: a race between two redelivered webhooks hitting the check-then-insert window simultaneously wouldn't be caught by a plain `select` first. The partial unique index makes the guarantee unconditional rather than "correct as long as nothing runs concurrently."
+
+**A single mutable `credit_balance` column instead of a ledger.** Rejected per the ticket's own acceptance criteria: the ledger is what makes a refund (#25) an ordinary insert rather than a retroactive edit, and what makes the balance auditable (recomputable from history) rather than trusted as a bare number that could drift from what actually happened.
+
+## Consequences
+
+- `#25` (credit-gated detailed reports) will add `detailed_report_consume` and `refund` rows to the same `credit_ledger` table and read `creditBalance()` the same way this ticket's UI does — no schema change anticipated there, only new `reason` values already allowed by the check constraint.
+- `#24` (private-repo analysis) is unaffected by this ticket; it consumes no credits.
+- Every future write to `subscriptions`/`credit_ledger` needs to go through the service role, following the explicit-value convention `subscriptions-repo.ts` already uses (mirroring `reports-repo.ts`/`user-profiles-repo.ts`) — there is no other write path RLS permits.
+- Stripe webhook payloads are stringly-typed unions (`string | Stripe.Customer | null` etc.) throughout the SDK; `idOf()` in `stripe-webhook.ts` centralizes unwrapping that once rather than repeating a type guard at every call site.
