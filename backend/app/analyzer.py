@@ -96,4 +96,5 @@ async def analyze(repo_url: str, settings: Settings) -> AnalyzeResponse:
         component_scores=scores,
         component_weights=WEIGHTS,
         ai_summary=summary,
+        private=bool(metadata.get("private", False)),
     )

@@ -60,7 +60,7 @@ def stub_repository(monkeypatch):
     )
 
     async def fake_metadata(owner, repo, token):
-        return {"size": 1_000}
+        return {"size": 1_000, "private": False}
 
     def fake_measure(owner, repo, settings):
         return metrics, scope
@@ -89,6 +89,38 @@ def test_unavailable_ai_summary_still_returns_a_report(client, stub_repository):
     # unmeasured components. A caller pairs the two by key to get a weighted
     # contribution without hand-mirroring WEIGHTS itself.
     assert body["component_weights"] == WEIGHTS
+    assert body["private"] is False
+
+
+def test_a_private_source_repository_is_flagged_as_such(client, monkeypatch):
+    """Issue #22: the Report records whether its source was private at
+    generation time, so the "never public" rule can be enforced downstream."""
+    metrics = make_metrics(has_tests=False, last_commit_days_ago=5.0)
+    scope = AnalysisScope(
+        total_files_seen=10,
+        files_analyzed=10,
+        truncated=False,
+        python_files_analyzed=10,
+        js_files_analyzed=0,
+    )
+
+    async def fake_metadata(owner, repo, token):
+        return {"size": 1_000, "private": True}
+
+    def fake_measure(owner, repo, settings):
+        return metrics, scope
+
+    monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
+    monkeypatch.setattr(analyzer, "_measure_clone", fake_measure)
+
+    response = client.post(
+        "/analyze",
+        json={"repo_url": "https://github.com/owner/repo"},
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["private"] is True
 
 
 def test_a_successful_summary_is_returned_alongside_the_metrics(
