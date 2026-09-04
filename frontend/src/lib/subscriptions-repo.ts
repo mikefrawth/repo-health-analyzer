@@ -139,6 +139,13 @@ type ReportCreditRow = {
   report_id: string;
 };
 
+/**
+ * Issue #37: retried by the analyze route (a lost response can make a
+ * successful insert look like a failure), so a second insert for the same
+ * Report is expected, not exceptional. Migration 0008's partial unique
+ * indexes reject it, and that rejection is treated as a no-op here, the same
+ * way grantMonthlyCredits treats a redelivered monthly_grant.
+ */
 async function writeReportCreditEntry(
   row: ReportCreditRow,
   amount: 1 | -1,
@@ -156,7 +163,7 @@ async function writeReportCreditEntry(
       report_id: row.report_id,
     });
 
-  if (error) {
+  if (error && error.code !== UNIQUE_VIOLATION) {
     throw new Error(`Could not ${failureVerb} credit for Report: ${error.message}`);
   }
 }
