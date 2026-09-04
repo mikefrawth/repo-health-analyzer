@@ -23,3 +23,19 @@ export function creditBalance(entries: LedgerEntry[], currentPeriodStart: string
     .filter((entry) => entry.billing_period_start === currentPeriodStart)
     .reduce((total, entry) => total + entry.amount, 0);
 }
+
+/**
+ * Issue #25: may this requester's analyze call spend a credit on a detailed
+ * Report (the AI Summary)? Pure and independently testable, with no live
+ * Stripe/Supabase call -- `status`/`remainingCredits` are already-fetched
+ * facts, not something this function goes and gets.
+ *
+ * `status: null` covers both "never subscribed" and "signed out" -- either
+ * way there is no credit balance to spend.
+ */
+export function canRequestDetailedReport(
+  status: SubscriptionStatus | null,
+  remainingCredits: number,
+): boolean {
+  return status === "active" && remainingCredits > 0;
+}

@@ -11,7 +11,7 @@
 
 import { REPORTS_TABLE, publicClient, serviceRoleClient } from "./supabase";
 import { serverClient } from "./supabase-server";
-import type { AnalyzeResponse, Report } from "./report";
+import { aiSummaryReason, type AnalyzeResponse, type Report } from "./report";
 
 export type RecentReport = {
   id: string;
@@ -22,7 +22,7 @@ export type RecentReport = {
 
 const REPORT_COLUMNS =
   "id, repo_url, metrics, health_score, analysis_scope, component_scores, component_weights, " +
-  "ai_summary, created_at, owner_id, is_public, source_repo_was_private";
+  "ai_summary, ai_summary_reason, created_at, owner_id, is_public, source_repo_was_private";
 
 /**
  * Persist a freshly-computed Report and return its id.
@@ -46,6 +46,10 @@ export async function saveReport(
       component_weights: analyzed.component_weights,
       // Preserved as null for a Partial Report — a valid Report, not an error.
       ai_summary: analyzed.ai_summary,
+      // Issue #25: explicit even when null (ADR-0008's convention), so a
+      // successful summary's `null` reason is a deliberate value on the row,
+      // not an unset default.
+      ai_summary_reason: aiSummaryReason(analyzed.ai_summary_attempted, analyzed.ai_summary),
       owner_id: ownerId,
       is_public: ownerId === null,
       source_repo_was_private: analyzed.private,

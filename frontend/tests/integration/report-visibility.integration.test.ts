@@ -75,6 +75,7 @@ async function insertReport(row: {
       component_scores: {},
       component_weights: {},
       ai_summary: null,
+      ai_summary_reason: "skipped_free_tier",
       ...row,
     })
     .select("id")

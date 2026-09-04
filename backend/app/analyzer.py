@@ -82,6 +82,7 @@ async def analyze(
     settings: Settings,
     user_github_token: str | None = None,
     user_github_token_scope: TokenScope | None = None,
+    generate_ai_summary: bool = True,
 ) -> AnalyzeResponse:
     owner, repo = parse_repo_url(repo_url)
 
@@ -117,12 +118,15 @@ async def analyze(
     # Issue #24: a private-repo Report is quantitative-only in v1 — no
     # subscription/credit machinery exists yet to charge for its AI Summary,
     # so it isn't generated at all rather than attempted and discarded.
-    # Otherwise, a failed summary yields a Partial Report; the metrics stand
-    # on their own.
+    # Issue #25: independently, the frontend's own credit-gating decision may
+    # withhold the request entirely (no subscription, or no credits left this
+    # period) -- that's `generate_ai_summary`, decided before this call, not
+    # by anything the backend knows about the requester.
+    attempt_summary = generate_ai_summary and not is_private
     summary = (
-        None
-        if is_private
-        else await generate_summary(repo_url, metrics, score, scope, settings)
+        await generate_summary(repo_url, metrics, score, scope, settings)
+        if attempt_summary
+        else None
     )
 
     return AnalyzeResponse(
@@ -133,5 +137,6 @@ async def analyze(
         component_scores=scores,
         component_weights=WEIGHTS,
         ai_summary=summary,
+        ai_summary_attempted=attempt_summary,
         private=is_private,
     )

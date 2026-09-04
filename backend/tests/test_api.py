@@ -90,6 +90,9 @@ def test_unavailable_ai_summary_still_returns_a_report(client, stub_repository):
     # contribution without hand-mirroring WEIGHTS itself.
     assert body["component_weights"] == WEIGHTS
     assert body["private"] is False
+    # No ANTHROPIC_API_KEY in test settings, so generation was tried and
+    # came back empty -- attempted, not skipped.
+    assert body["ai_summary_attempted"] is True
 
 
 def test_a_private_source_repository_is_flagged_as_such(client, monkeypatch):
@@ -249,6 +252,97 @@ def test_a_successful_summary_is_returned_alongside_the_metrics(
     assert body["ai_summary"]["risks"] == ["No test suite"]
     # The score is the formula's, unchanged by the summary's arrival.
     assert body["health_score"] == health_score(stub_repository)
+    assert body["ai_summary_attempted"] is True
+
+
+def test_generate_ai_summary_false_skips_generation_entirely(
+    client, stub_repository, monkeypatch
+):
+    """Issue #25: the frontend's credit-gating decision, not privacy, drives
+    this — a free-tier/anonymous request never even calls Claude."""
+    calls = []
+
+    async def fake_summary(repo_url, metrics, score, scope, settings):
+        calls.append(repo_url)
+        return AISummary(strengths=["x"], risks=["y"], suggestions=["z"])
+
+    monkeypatch.setattr(analyzer, "generate_summary", fake_summary)
+
+    response = client.post(
+        "/analyze",
+        json={
+            "repo_url": "https://github.com/owner/repo",
+            "generate_ai_summary": False,
+        },
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    body = response.json()
+    assert body["ai_summary"] is None
+    assert body["ai_summary_attempted"] is False
+    assert calls == []
+
+
+def test_ai_summary_attempted_is_false_for_a_private_repo_even_when_requested(
+    client, monkeypatch
+):
+    """Issue #24's private-repo skip still applies regardless of #25's flag --
+    generation was never tried, so it's "skipped", not "failed"."""
+    metrics = make_metrics(has_tests=False, last_commit_days_ago=5.0)
+    scope = AnalysisScope(
+        total_files_seen=10,
+        files_analyzed=10,
+        truncated=False,
+        python_files_analyzed=10,
+        js_files_analyzed=0,
+    )
+
+    async def fake_metadata(owner, repo, token):
+        return {"size": 1_000, "private": True}
+
+    def fake_measure(owner, repo, settings, token=""):
+        return metrics, scope
+
+    monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
+    monkeypatch.setattr(analyzer, "_measure_clone", fake_measure)
+
+    response = client.post(
+        "/analyze",
+        json={
+            "repo_url": "https://github.com/owner/repo",
+            "generate_ai_summary": True,
+        },
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    body = response.json()
+    assert body["ai_summary"] is None
+    assert body["ai_summary_attempted"] is False
+
+
+def test_ai_summary_attempted_is_true_when_generation_was_tried_and_failed(
+    client, stub_repository, monkeypatch
+):
+    """Distinguishes a subscriber's failed (and therefore refundable) attempt
+    from a free-tier request that never tried at all."""
+
+    async def fake_summary(repo_url, metrics, score, scope, settings):
+        return None
+
+    monkeypatch.setattr(analyzer, "generate_summary", fake_summary)
+
+    response = client.post(
+        "/analyze",
+        json={
+            "repo_url": "https://github.com/owner/repo",
+            "generate_ai_summary": True,
+        },
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    body = response.json()
+    assert body["ai_summary"] is None
+    assert body["ai_summary_attempted"] is True
 
 
 def test_a_request_under_the_daily_limit_is_allowed(client, stub_repository):

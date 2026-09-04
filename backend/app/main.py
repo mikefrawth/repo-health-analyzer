@@ -95,4 +95,5 @@ async def analyze_repository(
         settings,
         user_github_token=payload.github_token,
         user_github_token_scope=payload.github_token_scope,
+        generate_ai_summary=payload.generate_ai_summary,
     )

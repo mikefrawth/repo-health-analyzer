@@ -14,8 +14,17 @@ import {
   type AnalyzeFailure,
 } from "@/lib/analyze-errors";
 import { requestAnalysis, type RequesterToken } from "@/lib/backend";
+import type { AnalyzeResponse } from "@/lib/report";
 import { INVALID_REPO_URL_MESSAGE, parseRepoUrl } from "@/lib/repo-url";
 import { saveReport } from "@/lib/reports-repo";
+import { canRequestDetailedReport, creditBalance } from "@/lib/subscription";
+import {
+  consumeCreditForReport,
+  fetchOwnLedgerForPeriod,
+  fetchOwnSubscription,
+  refundCreditForReport,
+  type SubscriptionRow,
+} from "@/lib/subscriptions-repo";
 import { currentUser } from "@/lib/supabase-server";
 import { fetchGithubProfile } from "@/lib/user-profiles-repo";
 
@@ -31,10 +40,16 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const user = await currentUser();
   const requesterToken = user ? await requesterTokenFor(user.id) : null;
+  const gating = user ? await detailedReportGatingFor() : null;
 
   let analyzed;
   try {
-    analyzed = await requestAnalysis(repoUrl, clientIpFrom(request), requesterToken);
+    analyzed = await requestAnalysis(
+      repoUrl,
+      clientIpFrom(request),
+      requesterToken,
+      gating?.wantsDetailed ?? false,
+    );
   } catch (error) {
     // `requestAnalysis` answers an unreachable backend with `status: null`
     // rather than throwing, so the only way out here is `requireEnv` — a missing
@@ -65,9 +80,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     return failure(analyzeFailure);
   }
 
+  let id: string;
   try {
-    const id = await saveReport(analyzed.data, user?.id ?? null);
-    return NextResponse.json({ id }, { status: 201 });
+    id = await saveReport(analyzed.data, user?.id ?? null);
   } catch (error) {
     console.error("[analyze] analysis succeeded but the Report could not be saved:", error);
     return failure({
@@ -75,6 +90,95 @@ export async function POST(request: Request): Promise<NextResponse> {
       message:
         "We analyzed the repository but couldn't save the Report. Please try again.",
     });
+  }
+
+  if (gating?.wantsDetailed && user) {
+    await settleDetailedReportCredit(user.id, gating.subscription, id, analyzed.data);
+  }
+
+  return NextResponse.json({ id }, { status: 201 });
+}
+
+/**
+ * Issue #25: whether this signed-in user may spend a credit on a detailed
+ * Report right now, and the subscription row that decision was based on --
+ * carried forward so the eventual ledger write reuses the same period dates
+ * rather than re-fetching them.
+ */
+async function detailedReportGatingFor(): Promise<{
+  wantsDetailed: boolean;
+  subscription: SubscriptionRow;
+} | null> {
+  const subscription = await fetchOwnSubscription();
+  if (!subscription) {
+    return null;
+  }
+  const ledger = await fetchOwnLedgerForPeriod(subscription.current_period_start);
+  const balance = creditBalance(ledger, subscription.current_period_start);
+  return {
+    wantsDetailed: canRequestDetailedReport(subscription.status, balance),
+    subscription,
+  };
+}
+
+/**
+ * Consume the credit the gating decision approved, and refund it if
+ * generation was attempted but didn't come back with a summary. Ledger
+ * writes are best-effort here -- the Report itself is already saved, and a
+ * ledger hiccup shouldn't turn a successful analysis into a user-facing
+ * error.
+ *
+ * The two failure modes aren't equally bad: a failed *consume* leaves the
+ * subscriber undercharged, which costs us nothing they'd notice. A failed
+ * *refund* leaves them charged for a Report that has no AI Summary -- the
+ * exact outcome AC3 exists to rule out -- so that write gets a few retries
+ * before it's given up on and logged loudly enough for an operator to spot
+ * and reconcile by hand.
+ */
+async function settleDetailedReportCredit(
+  userId: string,
+  subscription: SubscriptionRow,
+  reportId: string,
+  analyzed: AnalyzeResponse,
+): Promise<void> {
+  if (!analyzed.ai_summary_attempted) {
+    // Never tried (e.g. the Target Repository turned out private) -- no
+    // credit was ever at stake.
+    return;
+  }
+  const row = {
+    user_id: userId,
+    billing_period_start: subscription.current_period_start,
+    billing_period_end: subscription.current_period_end,
+    report_id: reportId,
+  };
+
+  try {
+    await consumeCreditForReport(row);
+  } catch (error) {
+    console.error("[analyze] could not consume a credit for this Report:", error);
+    return;
+  }
+
+  if (analyzed.ai_summary !== null) {
+    return;
+  }
+
+  const REFUND_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= REFUND_ATTEMPTS; attempt++) {
+    try {
+      await refundCreditForReport(row);
+      return;
+    } catch (error) {
+      if (attempt === REFUND_ATTEMPTS) {
+        console.error(
+          `[analyze] URGENT: credit consumed for Report ${reportId} (user ${userId}) but the ` +
+            `refund failed after ${REFUND_ATTEMPTS} attempts -- the subscriber was charged for ` +
+            "a Partial Report. Needs manual reconciliation:",
+          error,
+        );
+      }
+    }
   }
 }
 
