@@ -33,6 +33,15 @@ from .token_resolution import TokenScope, resolve_github_token
 logger = logging.getLogger(__name__)
 
 
+def _needs_private_scope_error() -> AnalysisError:
+    return AnalysisError(
+        "This may be a private repository. Grant access to your "
+        "private GitHub repositories to try again.",
+        status_code=404,
+        code="needs_private_scope",
+    )
+
+
 def _measure_clone(
     owner: str, repo: str, settings: Settings, token: str = ""
 ) -> tuple[Metrics, AnalysisScope]:
@@ -99,15 +108,19 @@ async def analyze(
         metadata = await fetch_repo_metadata(owner, repo, choice.token)
     except AnalysisError as exc:
         if exc.status_code == 404 and choice.ambiguous_not_found:
-            raise AnalysisError(
-                "This may be a private repository. Grant access to your "
-                "private GitHub repositories to try again.",
-                status_code=404,
-                code="needs_private_scope",
-            ) from exc
+            raise _needs_private_scope_error() from exc
         raise
     assert_within_size_limit(metadata, settings.max_repo_size_kb)
     is_private = bool(metadata.get("private", False))
+
+    # Issue #38: no user token reached us, so the fallback token did this
+    # fetch -- and it can see this repo only because it's a broadly-scoped
+    # PAT, not because the requester has any claim to it. Saving a Report
+    # sourced from a private repo with no owner is forbidden at the database
+    # layer (migration 0005), so refuse now rather than cloning a repo whose
+    # Report can never be saved.
+    if is_private and choice.source == "fallback":
+        raise _needs_private_scope_error()
 
     metrics, scope = await run_in_threadpool(
         _measure_clone, owner, repo, settings, choice.token
