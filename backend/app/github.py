@@ -5,6 +5,7 @@ then a shallow clone that every analyser reads from. See
 docs/adr/0002-backend-owns-github-fetch-via-clone.md.
 """
 
+import base64
 import os
 import re
 import shutil
@@ -60,8 +61,9 @@ async def fetch_repo_metadata(owner: str, repo: str, token: str) -> dict:
 
     if response.status_code == 404:
         raise AnalysisError(
-            f"No public repository found at {owner}/{repo}. "
-            "It may not exist, or it may be private — private repos aren't supported yet.",
+            f"No repository found at {owner}/{repo}. It may not exist, be "
+            "misspelled, or be private and inaccessible with the token used "
+            "for this request.",
             status_code=404,
         )
     if response.status_code == 403:
@@ -95,13 +97,34 @@ def _force_remove_readonly(func, path, _exc_info) -> None:
     func(path)
 
 
+def _clone_env(token: str) -> dict[str, str]:
+    """An authenticated clone, without the token ever appearing in argv.
+
+    A token embedded in the clone URL itself would show up in `ps` output and
+    in git's own error messages (which this function's caller surfaces to the
+    user on failure). Passing the auth header via `GIT_CONFIG_*` env vars
+    (git >= 2.31) avoids both.
+    """
+    env = os.environ.copy()
+    basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+    env["GIT_CONFIG_COUNT"] = "1"
+    env["GIT_CONFIG_KEY_0"] = "http.extraheader"
+    env["GIT_CONFIG_VALUE_0"] = f"AUTHORIZATION: basic {basic}"
+    return env
+
+
 @contextmanager
-def clone_repository(owner: str, repo: str, depth: int) -> Iterator[Path]:
+def clone_repository(
+    owner: str, repo: str, depth: int, token: str = ""
+) -> Iterator[Path]:
     """Shallow-clone into a temp directory that is removed on the way out.
 
     Bounded depth rather than `--depth 1`: one commit is enough to know the
     repository's last-touched date but not enough to say anything about how
     actively it is worked on.
+
+    `token`, when given, authenticates the clone — required for a private
+    Target Repository the caller already confirmed access to via the API.
     """
     workdir = Path(tempfile.mkdtemp(prefix="repo-health-"))
     target = workdir / repo
@@ -119,11 +142,15 @@ def clone_repository(owner: str, repo: str, depth: int) -> Iterator[Path]:
             capture_output=True,
             text=True,
             timeout=180,
+            env=_clone_env(token) if token else None,
         )
         if result.returncode != 0:
             detail = result.stderr.strip().splitlines()
+            message = detail[-1] if detail else "unknown error"
+            if token:
+                message = message.replace(token, "***")
             raise AnalysisError(
-                f"Could not clone {owner}/{repo}: {detail[-1] if detail else 'unknown error'}",
+                f"Could not clone {owner}/{repo}: {message}",
                 status_code=502,
             )
         yield target

@@ -13,7 +13,7 @@ import type { AnalyzeResponse } from "./report";
 export type BackendResult =
   | { ok: true; data: AnalyzeResponse }
   /** `status: null` means no response arrived — the backend was unreachable. */
-  | { ok: false; status: number | null; detail: string | null };
+  | { ok: false; status: number | null; detail: string | null; code: string | null };
 
 /**
  * A clone plus a Claude call is not a fast request, and cutting it off early
@@ -21,9 +21,16 @@ export type BackendResult =
  */
 const ANALYZE_TIMEOUT_MS = 180_000;
 
+/** Issue #24: the signed-in requester's own GitHub token, when there is one. */
+export type RequesterToken = {
+  token: string;
+  scope: "public" | "repo";
+};
+
 export async function requestAnalysis(
   repoUrl: string,
   clientIp: string,
+  requesterToken?: RequesterToken | null,
 ): Promise<BackendResult> {
   const backendUrl = requireEnv("PYTHON_BACKEND_URL").replace(/\/+$/, "");
   const secret = requireEnv("INTERNAL_API_SECRET");
@@ -41,33 +48,43 @@ export async function requestAnalysis(
         // per visitor rather than per (shared) Next.js egress IP.
         "X-Client-Ip": clientIp,
       },
-      body: JSON.stringify({ repo_url: repoUrl }),
+      body: JSON.stringify({
+        repo_url: repoUrl,
+        github_token: requesterToken?.token ?? null,
+        github_token_scope: requesterToken?.scope ?? null,
+      }),
       signal: AbortSignal.timeout(ANALYZE_TIMEOUT_MS),
       cache: "no-store",
     });
   } catch {
     // Connection refused, DNS failure, or our own timeout: we never got a status.
-    return { ok: false, status: null, detail: null };
+    return { ok: false, status: null, detail: null, code: null };
   }
 
   if (!response.ok) {
-    return { ok: false, status: response.status, detail: await readDetail(response) };
+    const { detail, code } = await readFailureBody(response);
+    return { ok: false, status: response.status, detail, code };
   }
 
   try {
     return { ok: true, data: (await response.json()) as AnalyzeResponse };
   } catch {
     // A 200 we can't parse is an upstream failure, not a successful analysis.
-    return { ok: false, status: 502, detail: null };
+    return { ok: false, status: 502, detail: null, code: null };
   }
 }
 
-/** The backend renders its failures as `{"detail": "..."}`. */
-async function readDetail(response: Response): Promise<string | null> {
+/** The backend renders its failures as `{"detail": "...", "code"?: "..."}`. */
+async function readFailureBody(
+  response: Response,
+): Promise<{ detail: string | null; code: string | null }> {
   try {
-    const body = (await response.json()) as { detail?: unknown };
-    return typeof body.detail === "string" ? body.detail : null;
+    const body = (await response.json()) as { detail?: unknown; code?: unknown };
+    return {
+      detail: typeof body.detail === "string" ? body.detail : null,
+      code: typeof body.code === "string" ? body.code : null,
+    };
   } catch {
-    return null;
+    return { detail: null, code: null };
   }
 }

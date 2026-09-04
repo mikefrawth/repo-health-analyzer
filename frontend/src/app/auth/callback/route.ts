@@ -6,9 +6,9 @@
 
 import { NextResponse } from "next/server";
 
-import { githubProfileRow } from "@/lib/user-profile";
+import { githubProfileRow, widestScope, type GithubTokenScope } from "@/lib/user-profile";
 import { serverClient } from "@/lib/supabase-server";
-import { saveGithubProfile } from "@/lib/user-profiles-repo";
+import { fetchStoredGithubTokenScope, saveGithubProfile } from "@/lib/user-profiles-repo";
 
 export async function GET(request: Request): Promise<NextResponse> {
   const { origin, searchParams } = new URL(request.url);
@@ -27,7 +27,24 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.redirect(`${origin}/?auth_error=exchange_failed`);
   }
 
-  const profile = githubProfileRow(data.session.user, data.session.provider_token ?? null);
+  // Which scope `/auth/login` actually asked GitHub for on this round trip
+  // (issue #24) — round-tripped through the callback URL's own query string,
+  // since Supabase's session doesn't otherwise expose it. Widened against
+  // whatever scope was already on file, rather than written as-is: GitHub
+  // OAuth grants are cumulative per user+app, so a routine re-login that
+  // only asks for the default scope must not erase a "repo" scope this user
+  // already granted on an earlier round trip (see `widestScope`).
+  const requestedScope: GithubTokenScope =
+    searchParams.get("scope") === "private" ? "repo" : "public";
+  let scope: GithubTokenScope = requestedScope;
+  try {
+    const stored = await fetchStoredGithubTokenScope(data.session.user.id);
+    scope = widestScope(stored, requestedScope) ?? requestedScope;
+  } catch (readError) {
+    console.error("[auth/callback] could not read the previously-stored token scope:", readError);
+  }
+
+  const profile = githubProfileRow(data.session.user, data.session.provider_token ?? null, scope);
   try {
     await saveGithubProfile(profile);
   } catch (upsertError) {

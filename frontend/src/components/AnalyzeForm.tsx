@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import {
@@ -17,6 +17,7 @@ import { INVALID_REPO_URL_MESSAGE, parseRepoUrl } from "@/lib/repo-url";
 const FAILURE_TITLE: Record<AnalyzeErrorCode, string> = {
   invalid_url: "That URL doesn't look right",
   not_found: "We couldn't find that repository",
+  needs_private_scope: "This might be a private repository",
   rate_limited: "GitHub is rate-limiting us",
   too_large: "That repository is too large",
   upstream_failed: "The analysis didn't finish",
@@ -27,7 +28,13 @@ const FAILURE_TITLE: Record<AnalyzeErrorCode, string> = {
 
 export function AnalyzeForm() {
   const router = useRouter();
-  const [repoUrl, setRepoUrl] = useState("");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Issue #24: round-tripped back through `?repo=` after a "grant access to
+  // private repos" redirect (see the link below), so the user doesn't have
+  // to retype the URL they already typed once, just because granting access
+  // meant leaving the page.
+  const [repoUrl, setRepoUrl] = useState(() => searchParams.get("repo") ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<AnalyzeFailure | null>(null);
 
@@ -76,7 +83,7 @@ export function AnalyzeForm() {
     <div>
       <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row">
         <label htmlFor="repo-url" className="sr-only">
-          Public GitHub repository URL
+          GitHub repository URL
         </label>
         <input
           id="repo-url"
@@ -120,10 +127,25 @@ export function AnalyzeForm() {
             {FAILURE_TITLE[failure.code]}
           </p>
           <p className="mt-1 text-sm leading-relaxed text-rose-800">{failure.message}</p>
+          {failure.code === "needs_private_scope" ? (
+            <a
+              href={`/auth/login?scope=private&next=${encodeURIComponent(grantAccessReturnPath(pathname, repoUrl))}`}
+              className="mt-3 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700"
+            >
+              Grant access to private repos
+            </a>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
+}
+
+/** Where `/auth/login`'s consent step should return the visitor, carrying
+ * their already-typed repo URL along so they don't have to retype it. */
+function grantAccessReturnPath(pathname: string | null, repoUrl: string): string {
+  const path = pathname || "/";
+  return repoUrl ? `${path}?repo=${encodeURIComponent(repoUrl)}` : path;
 }
 
 /** Read the route's `{error: {code, message}}` body, tolerating a body-less response. */

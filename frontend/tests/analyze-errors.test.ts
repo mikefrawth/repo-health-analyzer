@@ -78,6 +78,19 @@ describe("describeAnalyzeFailure", () => {
     expect(failure.message).not.toContain("should be ignored");
   });
 
+  it("treats a backend-flagged 404 as needing private-repo consent, not a plain miss", () => {
+    // Issue #24: the backend can't tell "missing" from "private and
+    // invisible to this token" apart on its own — its explicit `code` in
+    // the response body is what settles it, not the shared 404 status.
+    const failure = describeAnalyzeFailure(404, "detail text", "needs_private_scope");
+    expect(failure.code).toBe("needs_private_scope");
+  });
+
+  it("ignores an unrecognized backend code and falls back to the status", () => {
+    const failure = describeAnalyzeFailure(404, undefined, "some_future_code");
+    expect(failure.code).toBe("not_found");
+  });
+
   it("describes a 404 as possibly-private, not merely missing", () => {
     // A private repo and a nonexistent one are indistinguishable to us, and
     // saying only "not found" sends the user hunting for a typo that isn't there.
@@ -112,6 +125,7 @@ function defaultMessageFor(code: AnalyzeErrorCode): string {
   const status: Record<AnalyzeErrorCode, number | null> = {
     invalid_url: 400,
     not_found: 404,
+    needs_private_scope: 404,
     rate_limited: 429,
     too_large: 413,
     upstream_failed: 502,
@@ -119,5 +133,6 @@ function defaultMessageFor(code: AnalyzeErrorCode): string {
     service_misconfigured: 401,
     unknown: 418,
   };
-  return describeAnalyzeFailure(status[code]).message;
+  const backendCode = code === "needs_private_scope" ? "needs_private_scope" : undefined;
+  return describeAnalyzeFailure(status[code], undefined, backendCode).message;
 }

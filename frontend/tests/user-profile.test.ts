@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { githubProfileRow, githubUsername } from "@/lib/user-profile";
+import { githubProfileRow, githubUsername, widestScope } from "@/lib/user-profile";
 import type { AuthUser } from "@/lib/user-profile";
 
 function makeUser(userMetadata: Record<string, unknown>): AuthUser {
@@ -59,5 +59,52 @@ describe("githubProfileRow", () => {
       github_token: null,
       github_token_scope: null,
     });
+  });
+
+  it("labels the token with the private-repo scope when that's what was requested", () => {
+    // Issue #24's progressive-consent step: a later OAuth round trip can ask
+    // for more than ticket #20's default.
+    const user = makeUser({ user_name: "octocat" });
+    expect(githubProfileRow(user, "gho_abc123", "repo")).toEqual({
+      id: user.id,
+      github_username: "octocat",
+      github_token: "gho_abc123",
+      github_token_scope: "repo",
+    });
+  });
+
+  it("stores a null scope even for a widened request when there's no token to label", () => {
+    const user = makeUser({ user_name: "octocat" });
+    expect(githubProfileRow(user, null, "repo")).toEqual({
+      id: user.id,
+      github_username: "octocat",
+      github_token: null,
+      github_token_scope: null,
+    });
+  });
+});
+
+describe("widestScope", () => {
+  it("keeps repo scope even when the newer request only asked for public", () => {
+    // A routine re-login (session expiry, sign out/in) must not un-grant
+    // private-repo access this user already gave on an earlier round trip.
+    expect(widestScope("repo", "public")).toBe("repo");
+  });
+
+  it("keeps repo scope regardless of which side it's on", () => {
+    expect(widestScope("public", "repo")).toBe("repo");
+  });
+
+  it("stays public when neither side has ever had repo scope", () => {
+    expect(widestScope("public", "public")).toBe("public");
+  });
+
+  it("treats a never-stored scope as no constraint", () => {
+    expect(widestScope(null, "public")).toBe("public");
+    expect(widestScope("repo", null)).toBe("repo");
+  });
+
+  it("is null only when neither side has ever had a token at all", () => {
+    expect(widestScope(null, null)).toBeNull();
   });
 });
