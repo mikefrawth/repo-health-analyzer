@@ -97,7 +97,10 @@ def test_unavailable_ai_summary_still_returns_a_report(client, stub_repository):
 
 def test_a_private_source_repository_is_flagged_as_such(client, monkeypatch):
     """Issue #22: the Report records whether its source was private at
-    generation time, so the "never public" rule can be enforced downstream."""
+    generation time, so the "never public" rule can be enforced downstream.
+
+    Requested with a signed-in user's own private-scope token -- the only
+    way a private repo is analyzed to completion at all, per issue #38."""
     metrics = make_metrics(has_tests=False, last_commit_days_ago=5.0)
     scope = AnalysisScope(
         total_files_seen=10,
@@ -118,7 +121,11 @@ def test_a_private_source_repository_is_flagged_as_such(client, monkeypatch):
 
     response = client.post(
         "/analyze",
-        json={"repo_url": "https://github.com/owner/repo"},
+        json={
+            "repo_url": "https://github.com/owner/repo",
+            "github_token": "users-own-token",
+            "github_token_scope": "repo",
+        },
         headers={"X-Internal-Secret": SECRET},
     )
 
@@ -127,6 +134,59 @@ def test_a_private_source_repository_is_flagged_as_such(client, monkeypatch):
     # Issue #24: a private-repo Report is quantitative-only in v1 — no
     # AI Summary is even attempted, regardless of whether Claude is configured.
     assert response.json()["ai_summary"] is None
+
+
+def test_an_anonymous_request_for_a_private_repo_is_refused_without_cloning(
+    client, monkeypatch
+):
+    """Issue #38: the server's fallback token can sometimes see a private repo
+    an anonymous requester can't -- saving that Report would violate migration
+    0005's "private source, no owner" constraint, so it's refused up front
+    instead of cloning, analyzing, and only then failing to save."""
+
+    async def fake_metadata(owner, repo, token):
+        return {"size": 1_000, "private": True}
+
+    measure_calls = []
+
+    def fake_measure(owner, repo, settings, token=""):
+        measure_calls.append((owner, repo))
+        raise AssertionError("should not clone a private repo for an anonymous requester")
+
+    monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
+    monkeypatch.setattr(analyzer, "_measure_clone", fake_measure)
+
+    response = client.post(
+        "/analyze",
+        json={"repo_url": "https://github.com/owner/repo"},
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "needs_private_scope"
+    assert measure_calls == []
+
+
+def test_a_signed_in_user_with_no_stored_token_is_also_refused_for_a_private_repo(
+    client, monkeypatch
+):
+    """Same as the anonymous case: no user token reached the backend, so it
+    can't tell "signed in, no token yet" from "not signed in" -- and doesn't
+    need to, since both fall back to the shared token identically."""
+
+    async def fake_metadata(owner, repo, token):
+        return {"size": 1_000, "private": True}
+
+    monkeypatch.setattr(analyzer, "fetch_repo_metadata", fake_metadata)
+
+    response = client.post(
+        "/analyze",
+        json={"repo_url": "https://github.com/owner/repo", "github_token_scope": "public"},
+        headers={"X-Internal-Secret": SECRET},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "needs_private_scope"
 
 
 def test_a_users_own_token_is_preferred_over_the_server_fallback(client, monkeypatch):
@@ -287,7 +347,10 @@ def test_ai_summary_attempted_is_false_for_a_private_repo_even_when_requested(
     client, monkeypatch
 ):
     """Issue #24's private-repo skip still applies regardless of #25's flag --
-    generation was never tried, so it's "skipped", not "failed"."""
+    generation was never tried, so it's "skipped", not "failed".
+
+    Requested with a signed-in user's own private-scope token, per #38 --
+    that's the only way this repo gets analyzed at all."""
     metrics = make_metrics(has_tests=False, last_commit_days_ago=5.0)
     scope = AnalysisScope(
         total_files_seen=10,
@@ -311,6 +374,8 @@ def test_ai_summary_attempted_is_false_for_a_private_repo_even_when_requested(
         json={
             "repo_url": "https://github.com/owner/repo",
             "generate_ai_summary": True,
+            "github_token": "users-own-token",
+            "github_token_scope": "repo",
         },
         headers={"X-Internal-Secret": SECRET},
     )
