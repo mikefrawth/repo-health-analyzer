@@ -139,6 +139,28 @@ type ReportCreditRow = {
   report_id: string;
 };
 
+async function writeReportCreditEntry(
+  row: ReportCreditRow,
+  amount: 1 | -1,
+  reason: "detailed_report_consume" | "refund",
+  failureVerb: string,
+): Promise<void> {
+  const { error } = await serviceRoleClient()
+    .from(CREDIT_LEDGER_TABLE)
+    .insert({
+      user_id: row.user_id,
+      amount,
+      reason,
+      billing_period_start: row.billing_period_start,
+      billing_period_end: row.billing_period_end,
+      report_id: row.report_id,
+    });
+
+  if (error) {
+    throw new Error(`Could not ${failureVerb} credit for Report: ${error.message}`);
+  }
+}
+
 /**
  * The analyze route's write, once it has decided (via
  * `canRequestDetailedReport`) to spend a credit on a detailed Report.
@@ -146,20 +168,7 @@ type ReportCreditRow = {
  * write path exists (migration 0006).
  */
 export async function consumeCreditForReport(row: ReportCreditRow): Promise<void> {
-  const { error } = await serviceRoleClient()
-    .from(CREDIT_LEDGER_TABLE)
-    .insert({
-      user_id: row.user_id,
-      amount: -1,
-      reason: "detailed_report_consume",
-      billing_period_start: row.billing_period_start,
-      billing_period_end: row.billing_period_end,
-      report_id: row.report_id,
-    });
-
-  if (error) {
-    throw new Error(`Could not consume credit for Report: ${error.message}`);
-  }
+  await writeReportCreditEntry(row, -1, "detailed_report_consume", "consume");
 }
 
 /**
@@ -170,18 +179,5 @@ export async function consumeCreditForReport(row: ReportCreditRow): Promise<void
  * ledger is append-only).
  */
 export async function refundCreditForReport(row: ReportCreditRow): Promise<void> {
-  const { error } = await serviceRoleClient()
-    .from(CREDIT_LEDGER_TABLE)
-    .insert({
-      user_id: row.user_id,
-      amount: 1,
-      reason: "refund",
-      billing_period_start: row.billing_period_start,
-      billing_period_end: row.billing_period_end,
-      report_id: row.report_id,
-    });
-
-  if (error) {
-    throw new Error(`Could not refund credit for Report: ${error.message}`);
-  }
+  await writeReportCreditEntry(row, 1, "refund", "refund");
 }

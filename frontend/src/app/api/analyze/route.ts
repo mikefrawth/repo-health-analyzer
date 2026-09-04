@@ -126,7 +126,14 @@ async function detailedReportGatingFor(): Promise<{
  * generation was attempted but didn't come back with a summary. Ledger
  * writes are best-effort here -- the Report itself is already saved, and a
  * ledger hiccup shouldn't turn a successful analysis into a user-facing
- * error; it's logged for an operator to reconcile instead.
+ * error.
+ *
+ * The two failure modes aren't equally bad: a failed *consume* leaves the
+ * subscriber undercharged, which costs us nothing they'd notice. A failed
+ * *refund* leaves them charged for a Report that has no AI Summary -- the
+ * exact outcome AC3 exists to rule out -- so that write gets a few retries
+ * before it's given up on and logged loudly enough for an operator to spot
+ * and reconcile by hand.
  */
 async function settleDetailedReportCredit(
   userId: string,
@@ -145,13 +152,33 @@ async function settleDetailedReportCredit(
     billing_period_end: subscription.current_period_end,
     report_id: reportId,
   };
+
   try {
     await consumeCreditForReport(row);
-    if (analyzed.ai_summary === null) {
-      await refundCreditForReport(row);
-    }
   } catch (error) {
-    console.error("[analyze] could not settle the credit ledger for this Report:", error);
+    console.error("[analyze] could not consume a credit for this Report:", error);
+    return;
+  }
+
+  if (analyzed.ai_summary !== null) {
+    return;
+  }
+
+  const REFUND_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= REFUND_ATTEMPTS; attempt++) {
+    try {
+      await refundCreditForReport(row);
+      return;
+    } catch (error) {
+      if (attempt === REFUND_ATTEMPTS) {
+        console.error(
+          `[analyze] URGENT: credit consumed for Report ${reportId} (user ${userId}) but the ` +
+            `refund failed after ${REFUND_ATTEMPTS} attempts -- the subscriber was charged for ` +
+            "a Partial Report. Needs manual reconciliation:",
+          error,
+        );
+      }
+    }
   }
 }
 
