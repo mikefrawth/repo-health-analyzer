@@ -16,6 +16,11 @@ class AnalyzeRequest(BaseModel):
     # server's fallback token.
     github_token: str | None = None
     github_token_scope: Literal["public", "repo"] | None = None
+    # Issue #25: the frontend's own credit-gating decision -- whether this
+    # requester may spend a credit on a detailed Report. Defaults to True so
+    # an internal caller that omits it (there is only one today) still gets
+    # the pre-#25 behaviour of always trying.
+    generate_ai_summary: bool = True
 
 
 # The seven categories the Health Score formula weights and combines (see
@@ -99,6 +104,12 @@ class AnalyzeResponse(BaseModel):
     component_weights: dict[ComponentKey, int]
     # None means a Partial Report: Metrics succeeded, the AI Summary did not.
     ai_summary: AISummary | None = None
+    # Issue #25: whether generation was actually tried -- False for a private
+    # repo (issue #24) or a `generate_ai_summary=False` request, either of
+    # which never call Claude at all. Lets the frontend tell "skipped" (no
+    # credit spent) apart from "failed" (spent, refund it) when `ai_summary`
+    # comes back null either way.
+    ai_summary_attempted: bool = False
     # Whether the Target Repository was private on GitHub at generation time.
     # Recorded on the Report itself (issue #22) so the "a Report sourced from a
     # private repo can never be made public" rule can be enforced downstream,

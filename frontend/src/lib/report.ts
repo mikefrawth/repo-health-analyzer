@@ -82,9 +82,26 @@ export type AnalyzeResponse = {
   component_weights: ComponentWeights;
   /** `null` is a Partial Report — a complete, valid Report, not an error. */
   ai_summary: AISummary | null;
+  /**
+   * Issue #25: whether the backend actually tried to generate the AI
+   * Summary. False for a private repo (issue #24) or a request that never
+   * asked for one at all (no subscription, or no credits left this period)
+   * — as opposed to true with `ai_summary: null`, which means it tried and
+   * Claude came back empty. Distinguishes "skipped" from "failed" when
+   * `ai_summary` is null either way.
+   */
+  ai_summary_attempted: boolean;
   /** Whether the Target Repository was private on GitHub at generation time. */
   private: boolean;
 };
+
+/**
+ * Issue #25: why a Report has no AI Summary, distinct from the free-tier
+ * "never even asked" case so the UI (and any future refund logic) can tell
+ * them apart. `null` alongside a non-null `ai_summary` never happens; this
+ * type only describes the null case.
+ */
+export type AISummaryReason = "skipped_free_tier" | "failed";
 
 /** A Report as stored in, and read back from, Supabase. */
 export type Report = AnalyzeResponse & {
@@ -96,11 +113,28 @@ export type Report = AnalyzeResponse & {
   is_public: boolean;
   /** Renamed on the row from `AnalyzeResponse.private` for read-side clarity. */
   source_repo_was_private: boolean;
+  /** `null` whenever `ai_summary` is non-null; see `AISummaryReason`. */
+  ai_summary_reason: AISummaryReason | null;
 };
 
 /** A Report whose Metrics and Health Score survived but whose AI Summary did not. */
 export function isPartialReport(report: Pick<Report, "ai_summary">): boolean {
   return report.ai_summary === null;
+}
+
+/**
+ * Issue #25: the reason a fresh analyze response has no AI Summary, computed
+ * from what the backend actually did rather than re-deriving credit state --
+ * pure, so it's tested without a live payment provider.
+ */
+export function aiSummaryReason(
+  attempted: boolean,
+  summary: AISummary | null,
+): AISummaryReason | null {
+  if (summary !== null) {
+    return null;
+  }
+  return attempted ? "failed" : "skipped_free_tier";
 }
 
 /**

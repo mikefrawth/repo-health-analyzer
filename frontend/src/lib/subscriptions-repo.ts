@@ -131,3 +131,57 @@ export async function grantMonthlyCredits(row: {
     throw new Error(`Could not grant monthly credits: ${error.message}`);
   }
 }
+
+type ReportCreditRow = {
+  user_id: string;
+  billing_period_start: string;
+  billing_period_end: string;
+  report_id: string;
+};
+
+/**
+ * The analyze route's write, once it has decided (via
+ * `canRequestDetailedReport`) to spend a credit on a detailed Report.
+ * Service-role, like every other write to this table -- no non-service-role
+ * write path exists (migration 0006).
+ */
+export async function consumeCreditForReport(row: ReportCreditRow): Promise<void> {
+  const { error } = await serviceRoleClient()
+    .from(CREDIT_LEDGER_TABLE)
+    .insert({
+      user_id: row.user_id,
+      amount: -1,
+      reason: "detailed_report_consume",
+      billing_period_start: row.billing_period_start,
+      billing_period_end: row.billing_period_end,
+      report_id: row.report_id,
+    });
+
+  if (error) {
+    throw new Error(`Could not consume credit for Report: ${error.message}`);
+  }
+}
+
+/**
+ * Issue #25: when a detailed Report's AI Summary generation fails after a
+ * credit was already consumed, this is the offsetting entry that gives it
+ * back -- an additional ledger row, never a retroactive edit to the consume
+ * row or a direct balance mutation (see migration 0006's own note on why the
+ * ledger is append-only).
+ */
+export async function refundCreditForReport(row: ReportCreditRow): Promise<void> {
+  const { error } = await serviceRoleClient()
+    .from(CREDIT_LEDGER_TABLE)
+    .insert({
+      user_id: row.user_id,
+      amount: 1,
+      reason: "refund",
+      billing_period_start: row.billing_period_start,
+      billing_period_end: row.billing_period_end,
+      report_id: row.report_id,
+    });
+
+  if (error) {
+    throw new Error(`Could not refund credit for Report: ${error.message}`);
+  }
+}

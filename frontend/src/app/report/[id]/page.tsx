@@ -69,7 +69,7 @@ export default async function ReportPage({ params }: { params: { id: string } })
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
           Summary
         </h2>
-        <SummarySections summary={report.ai_summary} />
+        <SummarySections summary={report.ai_summary} reason={report.ai_summary_reason} />
       </section>
     </article>
   );

@@ -31,6 +31,11 @@ export async function requestAnalysis(
   repoUrl: string,
   clientIp: string,
   requesterToken?: RequesterToken | null,
+  // Issue #25: the caller's own credit-gating decision -- whether this
+  // request may spend a credit generating the AI Summary. Defaults to false
+  // so an anonymous/free-tier caller that doesn't pass it explicitly gets
+  // the free (no AI Summary) Report, never an unintended paid one.
+  generateAiSummary = false,
 ): Promise<BackendResult> {
   const backendUrl = requireEnv("PYTHON_BACKEND_URL").replace(/\/+$/, "");
   const secret = requireEnv("INTERNAL_API_SECRET");
@@ -52,6 +57,7 @@ export async function requestAnalysis(
         repo_url: repoUrl,
         github_token: requesterToken?.token ?? null,
         github_token_scope: requesterToken?.scope ?? null,
+        generate_ai_summary: generateAiSummary,
       }),
       signal: AbortSignal.timeout(ANALYZE_TIMEOUT_MS),
       cache: "no-store",
