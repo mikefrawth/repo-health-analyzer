@@ -158,6 +158,13 @@ def test_unmeasurable_recency_drops_the_component():
     assert "commit_recency" not in scores
 
 
+def test_unmeasurable_commit_activity_drops_the_component():
+    """The defect this fixes: a git log timeout scored 0.0 -- penalised as
+    genuinely inactive rather than dropped as unmeasurable."""
+    scores = component_scores(make_metrics(commits_in_window=None))
+    assert "commit_activity" not in scores
+
+
 def test_no_manifest_is_unmeasurable_not_a_penalty():
     """A repo with no dependency file isn't unhealthy — it's unmeasured."""
     scores = component_scores(make_metrics(dependency_count=None))

@@ -19,6 +19,10 @@ export function formatDependencyCount(count: number | null): string {
   return count === null ? NOT_MEASURED : String(count);
 }
 
+export function formatCommitsInWindow(commits: number | null): string {
+  return commits === null ? NOT_MEASURED : String(commits);
+}
+
 export function formatLastCommit(daysAgo: number | null): string {
   if (daysAgo === null) {
     return NOT_MEASURED;

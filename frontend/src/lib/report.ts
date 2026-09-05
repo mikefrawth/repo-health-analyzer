@@ -22,7 +22,7 @@ export type Metrics = {
   has_ci: boolean;
   has_readme: boolean;
   last_commit_days_ago: number | null;
-  commits_in_window: number;
+  commits_in_window: number | null;
   language_breakdown: Record<string, number>;
   primary_language: string | null;
   /** Absent when the Target Repository's language has no supported analyzer. */

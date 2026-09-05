@@ -68,7 +68,7 @@ class Metrics(BaseModel):
     has_ci: bool
     has_readme: bool
     last_commit_days_ago: float | None
-    commits_in_window: int
+    commits_in_window: int | None
     language_breakdown: dict[str, int] = Field(default_factory=dict)
     primary_language: str | None
     complexity: ComplexitySignal | None = None
