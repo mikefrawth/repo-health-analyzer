@@ -118,6 +118,36 @@ describe("handleStripeEvent: checkout.session.completed", () => {
     expect(deps.upsertSubscription).not.toHaveBeenCalled();
     expect(deps.grantMonthlyCredits).not.toHaveBeenCalled();
   });
+
+  it("resubscribes a user whose prior subscription was canceled, under a brand-new Stripe subscription id", async () => {
+    // Issue #35: a canceled row for this user already exists, keyed on a
+    // different (now-defunct) stripe_subscription_id. The handler doesn't
+    // branch on that -- it's upsertSubscription's onConflict target that
+    // must key on the user, not the old subscription id, or this legitimate
+    // resubscribe would 500 the webhook. This test pins the handler's
+    // contract; subscriptions-repo.test.ts pins the onConflict target itself.
+    const deps = makeDeps();
+    deps.getSubscriptionPeriod.mockResolvedValue({
+      status: "active",
+      current_period_start: "2026-09-01T00:00:00.000Z",
+      current_period_end: "2026-10-01T00:00:00.000Z",
+    });
+
+    const event = makeEvent("checkout.session.completed", {
+      client_reference_id: "user-1",
+      customer: "cus_123",
+      subscription: "sub_B",
+    });
+
+    await handleStripeEvent(event, deps);
+
+    expect(deps.upsertSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: "user-1", stripe_subscription_id: "sub_B" }),
+    );
+    expect(deps.grantMonthlyCredits).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: "user-1" }),
+    );
+  });
 });
 
 describe("handleStripeEvent: invoice.paid", () => {
