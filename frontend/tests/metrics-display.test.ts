@@ -5,6 +5,7 @@ import {
   NOT_MEASURED,
   componentScoreChartData,
   describeComplexity,
+  formatCommitsInWindow,
   formatDependencyCount,
   formatLastCommit,
   healthScoreBand,
@@ -36,6 +37,20 @@ describe("formatDependencyCount", () => {
 
   it("renders a measured count plainly", () => {
     expect(formatDependencyCount(37)).toBe("37");
+  });
+});
+
+describe("formatCommitsInWindow", () => {
+  // Issue #34: an unmeasurable git log (a timeout, a non-zero exit) must not
+  // read the same as a repository that was measured and genuinely has none.
+  it("distinguishes an unmeasurable count from a genuine zero", () => {
+    expect(formatCommitsInWindow(null)).toBe(NOT_MEASURED);
+    expect(formatCommitsInWindow(0)).toBe("0");
+    expect(formatCommitsInWindow(0)).not.toBe(formatCommitsInWindow(null));
+  });
+
+  it("renders a measured count plainly", () => {
+    expect(formatCommitsInWindow(12)).toBe("12");
   });
 });
 

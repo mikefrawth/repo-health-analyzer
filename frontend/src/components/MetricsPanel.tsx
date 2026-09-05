@@ -3,6 +3,7 @@ import { LanguageChart } from "@/components/LanguageChart";
 import {
   NOT_MEASURED,
   describeComplexity,
+  formatCommitsInWindow,
   formatDependencyCount,
   formatLastCommit,
 } from "@/lib/metrics-display";
@@ -73,7 +74,7 @@ export function MetricsPanel({
           />
           <MetricCard
             label="Commits (last 90 days)"
-            value={String(metrics.commits_in_window)}
+            value={formatCommitsInWindow(metrics.commits_in_window)}
             note="Counted within a trailing window, so old history can't read as activity."
           />
           <MetricCard

@@ -1,6 +1,7 @@
 """Heuristics for tests / CI / README / dependencies."""
 
 import json
+import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -10,6 +11,7 @@ from app.metrics import (
     _has_readme,
     _has_tests,
     count_recent_commits,
+    read_commit_history,
 )
 
 NOW = datetime(2026, 8, 15, tzinfo=UTC)
@@ -34,6 +36,47 @@ def test_a_long_dead_repo_has_no_recent_activity():
 
 def test_an_empty_history_counts_zero():
     assert count_recent_commits([], now=NOW, window_days=90) == 0
+
+
+def test_timed_out_git_log_is_unmeasurable_not_zero(monkeypatch, tmp_path):
+    """The defect this fixes: a subprocess timeout looked identical to a
+    repository with zero commits, so it was scored (and penalised) as one."""
+
+    def _raise_timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="git log", timeout=30)
+
+    monkeypatch.setattr(subprocess, "run", _raise_timeout)
+
+    days_ago, commits = read_commit_history(tmp_path)
+
+    assert days_ago is None
+    assert commits is None
+
+
+def test_non_zero_git_log_exit_is_unmeasurable_not_zero(monkeypatch, tmp_path):
+    class _Result:
+        returncode = 128
+        stdout = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: _Result())
+
+    days_ago, commits = read_commit_history(tmp_path)
+
+    assert days_ago is None
+    assert commits is None
+
+
+def test_unparseable_git_log_output_is_unmeasurable_not_zero(monkeypatch, tmp_path):
+    class _Result:
+        returncode = 0
+        stdout = "not-a-timestamp\n\n"
+
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: _Result())
+
+    days_ago, commits = read_commit_history(tmp_path)
+
+    assert days_ago is None
+    assert commits is None
 
 
 @pytest.mark.parametrize(

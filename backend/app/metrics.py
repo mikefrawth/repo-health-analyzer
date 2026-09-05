@@ -117,8 +117,14 @@ def count_recent_commits(
     return sum(1 for stamp in timestamps if stamp >= cutoff)
 
 
-def read_commit_history(root: Path) -> tuple[float | None, int]:
-    """(days since the last commit, commits within the activity window)."""
+def read_commit_history(root: Path) -> tuple[float | None, int | None]:
+    """(days since the last commit, commits within the activity window).
+
+    Both are None together on any failure -- a timeout, a non-zero exit, an
+    OSError, or output that doesn't parse -- so an unmeasurable commit
+    history is dropped from the Health Score formula rather than scored as
+    zero activity (issue #34).
+    """
     try:
         result = subprocess.run(
             ["git", "log", "--format=%cI"],
@@ -128,10 +134,10 @@ def read_commit_history(root: Path) -> tuple[float | None, int]:
             timeout=30,
         )
     except (subprocess.TimeoutExpired, OSError):
-        return None, 0
+        return None, None
 
     if result.returncode != 0:
-        return None, 0
+        return None, None
 
     parsed: list[datetime] = []
     for line in result.stdout.splitlines():
@@ -144,7 +150,7 @@ def read_commit_history(root: Path) -> tuple[float | None, int]:
             continue
 
     if not parsed:
-        return None, 0
+        return None, None
 
     now = datetime.now(UTC)
     days_ago = (now - parsed[0]).total_seconds() / 86_400

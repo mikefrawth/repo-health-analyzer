@@ -58,7 +58,9 @@ def _commit_recency(days_ago: float | None) -> float | None:
     return _lerp_down(days_ago, FRESH_DAYS, STALE_DAYS)
 
 
-def _commit_activity(commits: int) -> float:
+def _commit_activity(commits: int | None) -> float | None:
+    if commits is None:
+        return None
     return min(commits, ACTIVE_COMMITS) / ACTIVE_COMMITS
 
 
