@@ -61,9 +61,13 @@ export async function findUserIdBySubscription(
 }
 
 /**
- * Webhook-only: create or refresh a user's subscription row, keyed on
- * Stripe's own subscription id so a redelivered event updates the same row
- * rather than duplicating it.
+ * Webhook-only: create or refresh a user's subscription row, keyed on the
+ * user rather than on Stripe's subscription id. The schema (migration 0006)
+ * enforces one subscription row per user; the Stripe subscription id is the
+ * thing that legitimately changes underneath a user -- a cancel-then-
+ * resubscribe issues a brand-new one. Conflicting on it instead would try to
+ * INSERT a second row for a user who already has one and fail the `user_id`
+ * unique constraint (issue #35).
  */
 export async function upsertSubscription(row: {
   user_id: string;
@@ -75,7 +79,7 @@ export async function upsertSubscription(row: {
 }): Promise<void> {
   const { error } = await serviceRoleClient()
     .from(SUBSCRIPTIONS_TABLE)
-    .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: "stripe_subscription_id" });
+    .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
 
   if (error) {
     throw new Error(`Could not save subscription: ${error.message}`);
