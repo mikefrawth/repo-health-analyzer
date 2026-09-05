@@ -104,21 +104,30 @@ export async function POST(request: Request): Promise<NextResponse> {
  * Report right now, and the subscription row that decision was based on --
  * carried forward so the eventual ledger write reuses the same period dates
  * rather than re-fetching them.
+ *
+ * Issue #36: a transient Supabase read error here isn't fatal to analysis --
+ * same reasoning as `requesterTokenFor` -- so it degrades to "no gating"
+ * (the free-tier path) instead of throwing and 500-ing the whole request.
  */
 async function detailedReportGatingFor(): Promise<{
   wantsDetailed: boolean;
   subscription: SubscriptionRow;
 } | null> {
-  const subscription = await fetchOwnSubscription();
-  if (!subscription) {
+  try {
+    const subscription = await fetchOwnSubscription();
+    if (!subscription) {
+      return null;
+    }
+    const ledger = await fetchOwnLedgerForPeriod(subscription.current_period_start);
+    const balance = creditBalance(ledger, subscription.current_period_start);
+    return {
+      wantsDetailed: canRequestDetailedReport(subscription.status, balance),
+      subscription,
+    };
+  } catch (error) {
+    console.error("[analyze] could not load the signed-in user's subscription:", error);
     return null;
   }
-  const ledger = await fetchOwnLedgerForPeriod(subscription.current_period_start);
-  const balance = creditBalance(ledger, subscription.current_period_start);
-  return {
-    wantsDetailed: canRequestDetailedReport(subscription.status, balance),
-    subscription,
-  };
 }
 
 /**

@@ -28,10 +28,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let subscription: SubscriptionRow | null = null;
   let balance: number | null = null;
   if (user) {
-    subscription = await fetchOwnSubscription();
-    if (subscription?.status === "active") {
-      const ledger = await fetchOwnLedgerForPeriod(subscription.current_period_start);
-      balance = creditBalance(ledger, subscription.current_period_start);
+    // Issue #36: a transient Supabase read error here must not take down
+    // every page in the app -- degrade to "no subscription status shown"
+    // instead of throwing out of a layout that wraps the whole site.
+    try {
+      subscription = await fetchOwnSubscription();
+      if (subscription?.status === "active") {
+        const ledger = await fetchOwnLedgerForPeriod(subscription.current_period_start);
+        balance = creditBalance(ledger, subscription.current_period_start);
+      }
+    } catch (error) {
+      console.error("[layout] could not load the signed-in user's subscription:", error);
     }
   }
 
