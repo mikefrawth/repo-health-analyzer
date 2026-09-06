@@ -1,6 +1,6 @@
-# Pinned upstream Node image, copied in below instead of piping NodeSource's
-# install script through bash.
-FROM node:22-slim AS node
+# Pinned upstream Node image (digest, not just the mutable "22-slim" tag),
+# copied in below instead of piping NodeSource's install script through bash.
+FROM node:22-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS node
 
 FROM python:3.12-slim
 
