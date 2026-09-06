@@ -21,7 +21,7 @@ SECRET = "test-secret-value"
 @pytest.fixture
 def client():
     app.dependency_overrides[get_settings] = lambda: Settings(
-        internal_api_secret=SECRET
+        internal_api_secret=SECRET, anthropic_api_key=""
     )
     yield TestClient(app)
     app.dependency_overrides.clear()

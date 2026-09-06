@@ -168,6 +168,12 @@ def test_no_manifest_is_unmeasurable_rather_than_zero(tmp_path):
     assert _count_dependencies(tmp_path) is None
 
 
+def test_pyproject_with_no_dependencies_is_measured_as_zero(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = \"x\"\n", encoding="utf-8")
+
+    assert _count_dependencies(tmp_path) == 0
+
+
 def test_malformed_manifest_does_not_crash_the_analysis(tmp_path):
     (tmp_path / "package.json").write_text("{ not json", encoding="utf-8")
 

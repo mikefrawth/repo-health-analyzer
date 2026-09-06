@@ -92,8 +92,7 @@ def _count_dependencies(root: Path) -> int | None:
                 ((data.get("tool") or {}).get("poetry") or {}).get("dependencies") or {}
             )
             count = len(project_deps) + len(poetry_deps)
-            if count:
-                total = (total or 0) + count
+            total = (total or 0) + count
         except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError):
             pass
 
