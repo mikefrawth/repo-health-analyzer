@@ -1,13 +1,18 @@
+# Pinned upstream Node image, copied in below instead of piping NodeSource's
+# install script through bash.
+FROM node:22-slim AS node
+
 FROM python:3.12-slim
 
 # git: the backend clones each Target Repository rather than pulling files over
 # the REST API. nodejs/npm: the pinned ESLint install that produces the JS/TS
 # Complexity Signal.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends git curl ca-certificates \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && apt-get purge -y curl \
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,5 +34,11 @@ ENV JS_ANALYZER_DIR=/opt/js-analyzer \
 # Railway and Render both inject PORT.
 ENV PORT=8000
 EXPOSE 8000
+
+# Analysis of attacker-chosen repository contents (git clone, radon, ESLint)
+# should not run as root.
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+USER appuser
 
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
