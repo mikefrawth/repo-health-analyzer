@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { isReportId } from "@/lib/reports-repo";
 
@@ -29,5 +29,29 @@ describe("isReportId", () => {
     ]) {
       expect(isReportId(value), value).toBe(false);
     }
+  });
+});
+
+/**
+ * Issue #40: a non-uuid id must never reach Postgres here either — the same
+ * malformed-uuid error (`22P02`) that fetchReport already guards against
+ * would otherwise 500 the visibility route instead of no-op'ing.
+ */
+describe("makeReportPublic", () => {
+  it("rejects a malformed id without querying Supabase", async () => {
+    const update = vi.fn();
+    vi.doMock("@/lib/supabase-server", () => ({
+      serverClient: () => ({ from: () => ({ update }) }),
+    }));
+    vi.doMock("@/lib/supabase", () => ({ REPORTS_TABLE: "reports" }));
+
+    const { makeReportPublic } = await import("@/lib/reports-repo");
+
+    await expect(makeReportPublic("not-a-uuid")).resolves.toBe(false);
+    expect(update).not.toHaveBeenCalled();
+
+    vi.doUnmock("@/lib/supabase-server");
+    vi.doUnmock("@/lib/supabase");
+    vi.resetModules();
   });
 });
