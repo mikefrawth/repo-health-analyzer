@@ -49,7 +49,11 @@ export async function saveReport(
       // Issue #25: explicit even when null (ADR-0008's convention), so a
       // successful summary's `null` reason is a deliberate value on the row,
       // not an unset default.
-      ai_summary_reason: aiSummaryReason(analyzed.ai_summary_attempted, analyzed.ai_summary),
+      ai_summary_reason: aiSummaryReason(
+        analyzed.ai_summary_attempted,
+        analyzed.ai_summary,
+        analyzed.private,
+      ),
       owner_id: ownerId,
       is_public: ownerId === null,
       source_repo_was_private: analyzed.private,

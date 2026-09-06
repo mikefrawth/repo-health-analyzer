@@ -100,8 +100,14 @@ export type AnalyzeResponse = {
  * "never even asked" case so the UI (and any future refund logic) can tell
  * them apart. `null` alongside a non-null `ai_summary` never happens; this
  * type only describes the null case.
+ *
+ * Issue #39: `skipped_private_repo` is its own reason, separate from
+ * `skipped_free_tier` — the backend withholds generation for a private
+ * Target Repository (issue #24) regardless of plan, so a paying subscriber
+ * who happened to analyze a private repo must not be told "this used the
+ * free plan".
  */
-export type AISummaryReason = "skipped_free_tier" | "failed";
+export type AISummaryReason = "skipped_free_tier" | "skipped_private_repo" | "failed";
 
 /** A Report as stored in, and read back from, Supabase. */
 export type Report = AnalyzeResponse & {
@@ -126,15 +132,24 @@ export function isPartialReport(report: Pick<Report, "ai_summary">): boolean {
  * Issue #25: the reason a fresh analyze response has no AI Summary, computed
  * from what the backend actually did rather than re-deriving credit state --
  * pure, so it's tested without a live payment provider.
+ *
+ * Issue #39: `wasPrivate` distinguishes "never attempted because the Target
+ * Repository was private" from "never attempted, free tier" -- both look
+ * identical as `attempted: false` otherwise, but only one of them means the
+ * requester was on the free plan.
  */
 export function aiSummaryReason(
   attempted: boolean,
   summary: AISummary | null,
+  wasPrivate: boolean,
 ): AISummaryReason | null {
   if (summary !== null) {
     return null;
   }
-  return attempted ? "failed" : "skipped_free_tier";
+  if (attempted) {
+    return "failed";
+  }
+  return wasPrivate ? "skipped_private_repo" : "skipped_free_tier";
 }
 
 /**

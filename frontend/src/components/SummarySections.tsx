@@ -113,13 +113,21 @@ const NOTICE_COPY: Record<AISummaryReason | "unknown", { heading: string; body: 
       "Analysis Scope below were generated — all measured normally and unaffected: the " +
       "summary never contributes to the score.",
   },
+  skipped_private_repo: {
+    heading: "AI summary not included — this is a Partial Report",
+    body:
+      "The AI Summary isn't generated for a private repository, regardless of plan, so " +
+      "no credit was spent on this Report. Only the Health Score, Metrics, and Analysis " +
+      "Scope below were generated — all measured normally and unaffected: the summary " +
+      "never contributes to the score.",
+  },
   failed: {
     heading: "AI summary failed to generate — this is a Partial Report",
     body:
       "Generation was attempted but didn't come back successfully, so this Report " +
-      "doesn't have a written summary. The credit it would have spent was refunded. " +
-      "Everything above — the Health Score, the Metrics it was computed from, and the " +
-      "Analysis Scope — was measured normally and is unaffected.",
+      "doesn't have a written summary. A refund was requested for the credit it would " +
+      "have spent. Everything above — the Health Score, the Metrics it was computed " +
+      "from, and the Analysis Scope — was measured normally and is unaffected.",
   },
   unknown: {
     heading: "AI summary unavailable — this is a Partial Report",

@@ -30,15 +30,19 @@ const summary = { strengths: ["x"], risks: ["y"], suggestions: ["z"] };
  */
 describe("aiSummaryReason", () => {
   it("is null once an AI Summary was generated", () => {
-    expect(aiSummaryReason(true, summary)).toBeNull();
-    expect(aiSummaryReason(false, summary)).toBeNull();
+    expect(aiSummaryReason(true, summary, false)).toBeNull();
+    expect(aiSummaryReason(false, summary, false)).toBeNull();
   });
 
   it("is 'failed' when generation was attempted but came back empty", () => {
-    expect(aiSummaryReason(true, null)).toBe("failed");
+    expect(aiSummaryReason(true, null, false)).toBe("failed");
   });
 
-  it("is 'skipped_free_tier' when generation was never attempted", () => {
-    expect(aiSummaryReason(false, null)).toBe("skipped_free_tier");
+  it("is 'skipped_free_tier' when generation was never attempted for a public repo", () => {
+    expect(aiSummaryReason(false, null, false)).toBe("skipped_free_tier");
+  });
+
+  it("is 'skipped_private_repo' when generation was never attempted because the repo was private", () => {
+    expect(aiSummaryReason(false, null, true)).toBe("skipped_private_repo");
   });
 });
