@@ -102,6 +102,12 @@ const CHECK_VIOLATION = "23514";
  * here — the caller doesn't need to distinguish "not allowed" from "not yours").
  */
 export async function makeReportPublic(id: string): Promise<boolean> {
+  // Same guard as fetchReport: a malformed uuid 500s in Postgres with a code
+  // that isn't CHECK_VIOLATION, so it must be caught before the query.
+  if (!isReportId(id)) {
+    return false;
+  }
+
   const { data, error } = await serverClient()
     .from(REPORTS_TABLE)
     .update({ is_public: true })
