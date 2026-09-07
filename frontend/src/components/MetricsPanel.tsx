@@ -4,6 +4,7 @@ import {
   NOT_MEASURED,
   describeComplexity,
   formatCommitsInWindow,
+  formatCommitsInWindowLabel,
   formatDependencyCount,
   formatLastCommit,
 } from "@/lib/metrics-display";
@@ -73,7 +74,7 @@ export function MetricsPanel({
             value={formatLastCommit(metrics.last_commit_days_ago)}
           />
           <MetricCard
-            label="Commits (last 90 days)"
+            label={formatCommitsInWindowLabel(metrics.activity_window_days)}
             value={formatCommitsInWindow(metrics.commits_in_window)}
             note="Counted within a trailing window, so old history can't read as activity."
           />

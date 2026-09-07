@@ -23,6 +23,14 @@ export type Metrics = {
   has_readme: boolean;
   last_commit_days_ago: number | null;
   commits_in_window: number | null;
+  /**
+   * The trailing window `commits_in_window` was counted over, in days
+   * (mirrors the backend's `app.metrics.ACTIVITY_WINDOW_DAYS`). Sourced from
+   * the response rather than hard-coded a second time here, so a Report
+   * stays self-describing if the window is ever retuned (see ADR-0006's
+   * self-describing-Report principle, extended per issue #41).
+   */
+  activity_window_days: number;
   language_breakdown: Record<string, number>;
   primary_language: string | null;
   /** Absent when the Target Repository's language has no supported analyzer. */

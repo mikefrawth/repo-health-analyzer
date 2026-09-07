@@ -174,6 +174,7 @@ def compute_metrics(root: Path, scope: ScopeResult) -> Metrics:
         has_readme=_has_readme(files),
         last_commit_days_ago=last_commit_days_ago,
         commits_in_window=commits,
+        activity_window_days=ACTIVITY_WINDOW_DAYS,
         language_breakdown=breakdown,
         primary_language=primary_code_language(breakdown),
     )
