@@ -84,8 +84,8 @@ def test_unavailable_ai_summary_still_returns_a_report(client, stub_repository):
     assert body["ai_summary"] is None
     assert body["health_score"] == health_score(stub_repository)
     assert body["metrics"]["has_tests"] is False
-    # Issue #41: the window `commits_in_window` was counted over rides the
-    # response instead of being hard-coded a second time on the frontend.
+    # Issue #41: the window `commits_in_window` was counted over now rides
+    # the response instead of being hard-coded a second time on the frontend.
     assert body["metrics"]["activity_window_days"] == ACTIVITY_WINDOW_DAYS
     assert body["analysis_scope"]["total_files_seen"] == 120
     assert body["component_scores"] == pytest.approx(component_scores(stub_repository))

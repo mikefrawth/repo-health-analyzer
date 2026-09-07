@@ -184,7 +184,7 @@ def test_malformed_manifest_does_not_crash_the_analysis(tmp_path):
 
 
 def test_computed_metrics_disclose_the_activity_window(tmp_path, monkeypatch):
-    """Issue #41: the window `commits_in_window` was counted over rides
+    """Issue #41: the window `commits_in_window` was counted over now rides
     `Metrics` itself, rather than only living as a constant the frontend has
     to hard-code separately to describe the same number."""
     monkeypatch.setattr(
