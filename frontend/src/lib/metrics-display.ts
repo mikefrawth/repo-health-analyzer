@@ -23,6 +23,15 @@ export function formatCommitsInWindow(commits: number | null): string {
   return commits === null ? NOT_MEASURED : String(commits);
 }
 
+/**
+ * The "Commits (last N days)" label, sourced from the Report's own
+ * `activity_window_days` (issue #41) rather than a hard-coded "90" that could
+ * silently drift from `app.metrics.ACTIVITY_WINDOW_DAYS`.
+ */
+export function formatCommitsInWindowLabel(windowDays: number): string {
+  return `Commits (last ${windowDays} days)`;
+}
+
 export function formatLastCommit(daysAgo: number | null): string {
   if (daysAgo === null) {
     return NOT_MEASURED;

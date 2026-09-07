@@ -6,6 +6,7 @@ import {
   componentScoreChartData,
   describeComplexity,
   formatCommitsInWindow,
+  formatCommitsInWindowLabel,
   formatDependencyCount,
   formatLastCommit,
   healthScoreBand,
@@ -51,6 +52,15 @@ describe("formatCommitsInWindow", () => {
 
   it("renders a measured count plainly", () => {
     expect(formatCommitsInWindow(12)).toBe("12");
+  });
+});
+
+describe("formatCommitsInWindowLabel", () => {
+  // Issue #41: the label reads the window from the Report itself instead of
+  // a value hard-coded independently of the backend's ACTIVITY_WINDOW_DAYS.
+  it("reflects the given window rather than a hard-coded 90", () => {
+    expect(formatCommitsInWindowLabel(90)).toBe("Commits (last 90 days)");
+    expect(formatCommitsInWindowLabel(30)).toBe("Commits (last 30 days)");
   });
 });
 

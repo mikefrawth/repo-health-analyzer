@@ -6,13 +6,16 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from app.metrics import (
+    ACTIVITY_WINDOW_DAYS,
     _count_dependencies,
     _has_ci,
     _has_readme,
     _has_tests,
+    compute_metrics,
     count_recent_commits,
     read_commit_history,
 )
+from app.scope import ScopeResult
 
 NOW = datetime(2026, 8, 15, tzinfo=UTC)
 
@@ -178,3 +181,17 @@ def test_malformed_manifest_does_not_crash_the_analysis(tmp_path):
     (tmp_path / "package.json").write_text("{ not json", encoding="utf-8")
 
     assert _count_dependencies(tmp_path) is None
+
+
+def test_computed_metrics_disclose_the_activity_window(tmp_path, monkeypatch):
+    """Issue #41: the window `commits_in_window` was counted over now rides
+    `Metrics` itself, rather than only living as a constant the frontend has
+    to hard-code separately to describe the same number."""
+    monkeypatch.setattr(
+        "app.metrics.read_commit_history", lambda root: (10.0, 3)
+    )
+
+    scope = ScopeResult(files=["README.md"], total_seen=1, truncated=False)
+    metrics = compute_metrics(tmp_path, scope)
+
+    assert metrics.activity_window_days == ACTIVITY_WINDOW_DAYS

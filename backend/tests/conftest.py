@@ -11,6 +11,7 @@ def make_metrics(**overrides) -> Metrics:
         has_readme=True,
         last_commit_days_ago=10.0,
         commits_in_window=20,
+        activity_window_days=90,
         language_breakdown={"Python": 80},
         primary_language="Python",
         complexity=None,

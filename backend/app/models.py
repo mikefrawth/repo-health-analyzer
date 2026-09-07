@@ -69,6 +69,13 @@ class Metrics(BaseModel):
     has_readme: bool
     last_commit_days_ago: float | None
     commits_in_window: int | None
+    # The trailing window `commits_in_window` was counted over
+    # (`app.metrics.ACTIVITY_WINDOW_DAYS`). Shipped alongside the count it
+    # describes rather than left as a value the frontend has to hard-code
+    # separately, so a Report stays self-describing if the window is ever
+    # retuned (see ADR-0006's self-describing-Report principle, extended
+    # here per issue #41).
+    activity_window_days: int
     language_breakdown: dict[str, int] = Field(default_factory=dict)
     primary_language: str | None
     complexity: ComplexitySignal | None = None
