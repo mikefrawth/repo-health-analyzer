@@ -1,66 +1,23 @@
 import { describe, expect, it } from "vitest";
 
 import { parseRepoUrl, repoLabel } from "@/lib/repo-url";
+import repoUrlCases from "../../repo-url-cases.json";
 
 /**
  * This mirrors the backend's `parse_repo_url` (backend/app/github.py). The
  * frontend rejects a malformed URL before spending a backend call on it, so
- * the two must agree on what "a GitHub repository URL" means. These cases are
- * derived from the backend's regex, not from this implementation.
+ * the two must agree on what "a GitHub repository URL" means. The cases below
+ * are shared with backend/tests/test_github.py via repo-url-cases.json, so a
+ * change on either side that drifts from the other fails a test instead of
+ * shipping unnoticed. See issue #42.
  */
 describe("parseRepoUrl", () => {
-  it("accepts a canonical https URL", () => {
-    expect(parseRepoUrl("https://github.com/mikefrawth/repo-health-analyzer")).toEqual({
-      owner: "mikefrawth",
-      repo: "repo-health-analyzer",
-    });
+  it.each(repoUrlCases.accept)("accepts $url", ({ url, owner, repo }) => {
+    expect(parseRepoUrl(url)).toEqual({ owner, repo });
   });
 
-  it("accepts a URL with no protocol", () => {
-    expect(parseRepoUrl("github.com/owner/repo")).toEqual({ owner: "owner", repo: "repo" });
-  });
-
-  it("accepts http, www, a .git suffix and a trailing slash", () => {
-    for (const url of [
-      "http://github.com/owner/repo",
-      "https://www.github.com/owner/repo",
-      "https://github.com/owner/repo.git",
-      "https://github.com/owner/repo/",
-    ]) {
-      expect(parseRepoUrl(url), url).toEqual({ owner: "owner", repo: "repo" });
-    }
-  });
-
-  it("trims surrounding whitespace", () => {
-    expect(parseRepoUrl("  https://github.com/owner/repo  ")).toEqual({
-      owner: "owner",
-      repo: "repo",
-    });
-  });
-
-  it("accepts dots, underscores and hyphens in either segment", () => {
-    expect(parseRepoUrl("https://github.com/my-org/my_repo.js")).toEqual({
-      owner: "my-org",
-      repo: "my_repo.js",
-    });
-  });
-
-  it("rejects a host that is not github.com", () => {
-    expect(parseRepoUrl("https://gitlab.com/owner/repo")).toBeNull();
-    expect(parseRepoUrl("https://notgithub.com/owner/repo")).toBeNull();
-  });
-
-  it("rejects a URL with no repository segment", () => {
-    expect(parseRepoUrl("https://github.com/owner")).toBeNull();
-  });
-
-  it("rejects a URL pointing deeper than the repository root", () => {
-    expect(parseRepoUrl("https://github.com/owner/repo/tree/main")).toBeNull();
-  });
-
-  it("rejects empty and whitespace-only input", () => {
-    expect(parseRepoUrl("")).toBeNull();
-    expect(parseRepoUrl("   ")).toBeNull();
+  it.each(repoUrlCases.reject)("rejects %j", (url) => {
+    expect(parseRepoUrl(url)).toBeNull();
   });
 });
 
