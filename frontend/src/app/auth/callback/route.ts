@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 
+import { sanitizeNext } from "@/lib/sanitize-next";
 import { githubProfileRow, widestScope, type GithubTokenScope } from "@/lib/user-profile";
 import { serverClient } from "@/lib/supabase-server";
 import { fetchStoredGithubTokenScope, saveGithubProfile } from "@/lib/user-profiles-repo";
@@ -55,9 +56,4 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   return NextResponse.redirect(`${origin}${next}`);
-}
-
-/** Only ever redirect back into this app, never to an attacker-chosen host. */
-function sanitizeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }

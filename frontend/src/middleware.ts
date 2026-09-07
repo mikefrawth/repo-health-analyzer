@@ -6,33 +6,27 @@
  * runs ahead of them and is where the refreshed cookie actually gets set.
  */
 
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { supabaseSessionCredentials } from "./lib/env";
+import { sessionClient } from "./lib/supabase-session-client";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    ...supabaseSessionCredentials(),
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          for (const { name, value } of cookiesToSet) {
-            request.cookies.set(name, value);
-          }
-          response = NextResponse.next({ request });
-          for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
-          }
-        },
-      },
+  const supabase = sessionClient({
+    getAll() {
+      return request.cookies.getAll();
     },
-  );
+    setAll(cookiesToSet) {
+      for (const { name, value } of cookiesToSet) {
+        request.cookies.set(name, value);
+      }
+      response = NextResponse.next({ request });
+      for (const { name, value, options } of cookiesToSet) {
+        response.cookies.set(name, value, options);
+      }
+    },
+  });
 
   // Touches the session so an expired access token gets refreshed and the new
   // cookie is written above before the request reaches a Server Component.

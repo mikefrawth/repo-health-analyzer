@@ -11,6 +11,7 @@
 
 import { REPORTS_TABLE, publicClient, serviceRoleClient } from "./supabase";
 import { serverClient } from "./supabase-server";
+import { unwrap } from "./supabase-unwrap";
 import { aiSummaryReason, type AnalyzeResponse, type Report } from "./report";
 
 export type RecentReport = {
@@ -35,36 +36,39 @@ export async function saveReport(
   analyzed: AnalyzeResponse,
   ownerId: string | null,
 ): Promise<string> {
-  const { data, error } = await serviceRoleClient()
-    .from(REPORTS_TABLE)
-    .insert({
-      repo_url: analyzed.repo_url,
-      metrics: analyzed.metrics,
-      health_score: analyzed.health_score,
-      analysis_scope: analyzed.analysis_scope,
-      component_scores: analyzed.component_scores,
-      component_weights: analyzed.component_weights,
-      // Preserved as null for a Partial Report — a valid Report, not an error.
-      ai_summary: analyzed.ai_summary,
-      // Issue #25: explicit even when null (ADR-0008's convention), so a
-      // successful summary's `null` reason is a deliberate value on the row,
-      // not an unset default.
-      ai_summary_reason: aiSummaryReason(
-        analyzed.ai_summary_attempted,
-        analyzed.ai_summary,
-        analyzed.private,
-      ),
-      owner_id: ownerId,
-      is_public: ownerId === null,
-      source_repo_was_private: analyzed.private,
-    })
-    .select("id")
-    .single();
+  const row = await unwrap<{ id: string }>(
+    "save Report",
+    serviceRoleClient()
+      .from(REPORTS_TABLE)
+      .insert({
+        repo_url: analyzed.repo_url,
+        metrics: analyzed.metrics,
+        health_score: analyzed.health_score,
+        analysis_scope: analyzed.analysis_scope,
+        component_scores: analyzed.component_scores,
+        component_weights: analyzed.component_weights,
+        // Preserved as null for a Partial Report — a valid Report, not an error.
+        ai_summary: analyzed.ai_summary,
+        // Issue #25: explicit even when null (ADR-0008's convention), so a
+        // successful summary's `null` reason is a deliberate value on the row,
+        // not an unset default.
+        ai_summary_reason: aiSummaryReason(
+          analyzed.ai_summary_attempted,
+          analyzed.ai_summary,
+          analyzed.private,
+        ),
+        owner_id: ownerId,
+        is_public: ownerId === null,
+        source_repo_was_private: analyzed.private,
+      })
+      .select("id")
+      .single(),
+  );
 
-  if (error || !data) {
-    throw new Error(`Could not save Report: ${error?.message ?? "no row returned"}`);
+  if (!row) {
+    throw new Error("Could not save Report: no row returned");
   }
-  return data.id as string;
+  return row.id;
 }
 
 export async function fetchReport(id: string): Promise<Report | null> {
@@ -74,16 +78,10 @@ export async function fetchReport(id: string): Promise<Report | null> {
     return null;
   }
 
-  const { data, error } = await serverClient()
-    .from(REPORTS_TABLE)
-    .select(REPORT_COLUMNS)
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Could not load Report: ${error.message}`);
-  }
-  return (data as Report | null) ?? null;
+  return unwrap<Report>(
+    "load Report",
+    serverClient().from(REPORTS_TABLE).select(REPORT_COLUMNS).eq("id", id).maybeSingle(),
+  );
 }
 
 /** Postgres's code for a violated `check` constraint — here, migration 0005's
@@ -108,32 +106,24 @@ export async function makeReportPublic(id: string): Promise<boolean> {
     return false;
   }
 
-  const { data, error } = await serverClient()
-    .from(REPORTS_TABLE)
-    .update({ is_public: true })
-    .eq("id", id)
-    .select("id");
-
-  if (error) {
-    if (error.code === CHECK_VIOLATION) {
-      return false;
-    }
-    throw new Error(`Could not update Report visibility: ${error.message}`);
-  }
-  return (data?.length ?? 0) > 0;
+  const rows = await unwrap<{ id: string }[]>(
+    "update Report visibility",
+    serverClient().from(REPORTS_TABLE).update({ is_public: true }).eq("id", id).select("id"),
+    { tolerate: CHECK_VIOLATION },
+  );
+  return (rows?.length ?? 0) > 0;
 }
 
 export async function fetchRecentReports(limit = 12): Promise<RecentReport[]> {
-  const { data, error } = await publicClient()
-    .from(REPORTS_TABLE)
-    .select("id, repo_url, health_score, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    throw new Error(`Could not load recent Reports: ${error.message}`);
-  }
-  return (data as RecentReport[] | null) ?? [];
+  const rows = await unwrap<RecentReport[]>(
+    "load recent Reports",
+    publicClient()
+      .from(REPORTS_TABLE)
+      .select("id, repo_url, health_score, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  );
+  return rows ?? [];
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

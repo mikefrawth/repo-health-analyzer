@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 
+import { sanitizeNext } from "@/lib/sanitize-next";
 import { serverClient } from "@/lib/supabase-server";
 
 /** GitHub's OAuth scope that grants read access to private repositories. */
@@ -42,9 +43,4 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   return NextResponse.redirect(data.url);
-}
-
-/** Only ever redirect back into this app, never to an attacker-chosen host. */
-function sanitizeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
