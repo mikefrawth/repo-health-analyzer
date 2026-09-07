@@ -36,9 +36,11 @@ const DEFAULT_MESSAGES: Record<AnalyzeErrorCode, string> = {
   not_found:
     "We couldn't find that repository. It may not exist, be misspelled, or be " +
     "private — log in to analyze your own private repositories.",
-  needs_private_scope:
-    "This may be a private repository. Grant access to your private GitHub " +
-    "repositories to try again.",
+  // Only shown if the backend somehow raises this code without a detail — in
+  // practice the backend always sends one, and that's the single source of
+  // this sentence (backend/app/analyzer.py). This is a generic fallback, kept
+  // deliberately distinct from the backend's wording rather than copied.
+  needs_private_scope: "This may be a private repository you don't have access to.",
   rate_limited:
     "GitHub is rate-limiting us right now. Wait a few minutes and try again.",
   too_large:

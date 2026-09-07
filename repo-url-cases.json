@@ -1,0 +1,29 @@
+{
+  "$comment": "Shared accept/reject cases for the Target Repository URL pattern. Asserted by both backend/tests/test_github.py (parse_repo_url) and frontend/tests/repo-url.test.ts (parseRepoUrl) so the two can never silently disagree about what they accept. See issue #42.",
+  "accept": [
+    { "url": "https://github.com/owner/repo", "owner": "owner", "repo": "repo" },
+    { "url": "http://github.com/owner/repo", "owner": "owner", "repo": "repo" },
+    { "url": "github.com/owner/repo", "owner": "owner", "repo": "repo" },
+    { "url": "https://www.github.com/owner/repo", "owner": "owner", "repo": "repo" },
+    { "url": "https://github.com/owner/repo.git", "owner": "owner", "repo": "repo" },
+    { "url": "https://github.com/owner/repo/", "owner": "owner", "repo": "repo" },
+    { "url": "  https://github.com/owner/repo  ", "owner": "owner", "repo": "repo" },
+    { "url": "https://github.com/my-org/my.repo", "owner": "my-org", "repo": "my.repo" },
+    { "url": "https://github.com/my-org/my_repo.js", "owner": "my-org", "repo": "my_repo.js" },
+    {
+      "url": "https://github.com/mikefrawth/repo-health-analyzer",
+      "owner": "mikefrawth",
+      "repo": "repo-health-analyzer"
+    }
+  ],
+  "reject": [
+    "https://gitlab.com/owner/repo",
+    "https://notgithub.com/owner/repo",
+    "https://github.com/owner",
+    "https://github.com/owner/repo/tree/main",
+    "https://example.com/github.com/owner/repo",
+    "not a url at all",
+    "",
+    "   "
+  ]
+}

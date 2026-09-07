@@ -1,40 +1,25 @@
 """URL validation and the pre-clone size guard."""
 
+import json
+from pathlib import Path
+
 import pytest
 from app.errors import AnalysisError
 from app.github import assert_within_size_limit, parse_repo_url
 
-
-@pytest.mark.parametrize(
-    "url",
-    [
-        "https://github.com/owner/repo",
-        "http://github.com/owner/repo",
-        "github.com/owner/repo",
-        "https://www.github.com/owner/repo",
-        "https://github.com/owner/repo.git",
-        "https://github.com/owner/repo/",
-        "  https://github.com/owner/repo  ",
-    ],
+# Shared with frontend/tests/repo-url.test.ts, so the backend and frontend
+# patterns can never silently disagree about what they accept. See issue #42.
+_FIXTURE = json.loads(
+    (Path(__file__).parents[2] / "repo-url-cases.json").read_text(encoding="utf-8")
 )
-def test_accepts_the_shapes_users_actually_paste(url):
-    assert parse_repo_url(url) == ("owner", "repo")
 
 
-def test_preserves_dots_and_dashes_in_names():
-    assert parse_repo_url("https://github.com/my-org/my.repo") == ("my-org", "my.repo")
+@pytest.mark.parametrize("case", _FIXTURE["accept"], ids=lambda case: case["url"])
+def test_accepts_the_shapes_users_actually_paste(case):
+    assert parse_repo_url(case["url"]) == (case["owner"], case["repo"])
 
 
-@pytest.mark.parametrize(
-    "url",
-    [
-        "https://gitlab.com/owner/repo",
-        "https://github.com/owner",
-        "not a url at all",
-        "",
-        "https://example.com/github.com/owner/repo",
-    ],
-)
+@pytest.mark.parametrize("url", _FIXTURE["reject"], ids=lambda url: repr(url))
 def test_rejects_anything_that_is_not_a_github_repo_url(url):
     with pytest.raises(AnalysisError) as exc:
         parse_repo_url(url)
