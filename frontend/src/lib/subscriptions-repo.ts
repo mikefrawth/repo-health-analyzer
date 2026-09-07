@@ -10,6 +10,7 @@
 
 import { CREDIT_LEDGER_TABLE, SUBSCRIPTIONS_TABLE, serviceRoleClient } from "./supabase";
 import { serverClient } from "./supabase-server";
+import { unwrap } from "./supabase-unwrap";
 import type { LedgerEntry, SubscriptionStatus } from "./subscription";
 
 export type SubscriptionRow = {
@@ -20,44 +21,40 @@ export type SubscriptionRow = {
 
 /** The signed-in visitor's own subscription, or `null` if they have none. */
 export async function fetchOwnSubscription(): Promise<SubscriptionRow | null> {
-  const { data, error } = await serverClient()
-    .from(SUBSCRIPTIONS_TABLE)
-    .select("status, current_period_start, current_period_end")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Could not load subscription: ${error.message}`);
-  }
-  return (data as SubscriptionRow | null) ?? null;
+  return unwrap<SubscriptionRow>(
+    "load subscription",
+    serverClient()
+      .from(SUBSCRIPTIONS_TABLE)
+      .select("status, current_period_start, current_period_end")
+      .maybeSingle(),
+  );
 }
 
 /** The signed-in visitor's own ledger entries for one billing period. */
 export async function fetchOwnLedgerForPeriod(periodStart: string): Promise<LedgerEntry[]> {
-  const { data, error } = await serverClient()
-    .from(CREDIT_LEDGER_TABLE)
-    .select("amount, billing_period_start")
-    .eq("billing_period_start", periodStart);
-
-  if (error) {
-    throw new Error(`Could not load credit ledger: ${error.message}`);
-  }
-  return (data as LedgerEntry[] | null) ?? [];
+  const rows = await unwrap<LedgerEntry[]>(
+    "load credit ledger",
+    serverClient()
+      .from(CREDIT_LEDGER_TABLE)
+      .select("amount, billing_period_start")
+      .eq("billing_period_start", periodStart),
+  );
+  return rows ?? [];
 }
 
 /** Webhook-only: which user a Stripe subscription id belongs to, if any. */
 export async function findUserIdBySubscription(
   stripeSubscriptionId: string,
 ): Promise<string | null> {
-  const { data, error } = await serviceRoleClient()
-    .from(SUBSCRIPTIONS_TABLE)
-    .select("user_id")
-    .eq("stripe_subscription_id", stripeSubscriptionId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Could not look up subscription owner: ${error.message}`);
-  }
-  return (data?.user_id as string | undefined) ?? null;
+  const row = await unwrap<{ user_id: string }>(
+    "look up subscription owner",
+    serviceRoleClient()
+      .from(SUBSCRIPTIONS_TABLE)
+      .select("user_id")
+      .eq("stripe_subscription_id", stripeSubscriptionId)
+      .maybeSingle(),
+  );
+  return row?.user_id ?? null;
 }
 
 /**
@@ -77,13 +74,12 @@ export async function upsertSubscription(row: {
   current_period_start: string;
   current_period_end: string;
 }): Promise<void> {
-  const { error } = await serviceRoleClient()
-    .from(SUBSCRIPTIONS_TABLE)
-    .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
-
-  if (error) {
-    throw new Error(`Could not save subscription: ${error.message}`);
-  }
+  await unwrap(
+    "save subscription",
+    serviceRoleClient()
+      .from(SUBSCRIPTIONS_TABLE)
+      .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: "user_id" }),
+  );
 }
 
 /**
@@ -95,14 +91,13 @@ export async function updateSubscriptionStatus(
   stripeSubscriptionId: string,
   status: SubscriptionStatus,
 ): Promise<void> {
-  const { error } = await serviceRoleClient()
-    .from(SUBSCRIPTIONS_TABLE)
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("stripe_subscription_id", stripeSubscriptionId);
-
-  if (error) {
-    throw new Error(`Could not update subscription status: ${error.message}`);
-  }
+  await unwrap(
+    "update subscription status",
+    serviceRoleClient()
+      .from(SUBSCRIPTIONS_TABLE)
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("stripe_subscription_id", stripeSubscriptionId),
+  );
 }
 
 /** Postgres's code for a violated unique constraint. */
@@ -121,19 +116,19 @@ export async function grantMonthlyCredits(row: {
   billing_period_start: string;
   billing_period_end: string;
 }): Promise<void> {
-  const { error } = await serviceRoleClient()
-    .from(CREDIT_LEDGER_TABLE)
-    .insert({
-      user_id: row.user_id,
-      amount: row.amount,
-      reason: "monthly_grant",
-      billing_period_start: row.billing_period_start,
-      billing_period_end: row.billing_period_end,
-    });
-
-  if (error && error.code !== UNIQUE_VIOLATION) {
-    throw new Error(`Could not grant monthly credits: ${error.message}`);
-  }
+  await unwrap(
+    "grant monthly credits",
+    serviceRoleClient()
+      .from(CREDIT_LEDGER_TABLE)
+      .insert({
+        user_id: row.user_id,
+        amount: row.amount,
+        reason: "monthly_grant",
+        billing_period_start: row.billing_period_start,
+        billing_period_end: row.billing_period_end,
+      }),
+    { tolerate: UNIQUE_VIOLATION },
+  );
 }
 
 type ReportCreditRow = {
@@ -156,20 +151,20 @@ async function writeReportCreditEntry(
   reason: "detailed_report_consume" | "refund",
   failureVerb: string,
 ): Promise<void> {
-  const { error } = await serviceRoleClient()
-    .from(CREDIT_LEDGER_TABLE)
-    .insert({
-      user_id: row.user_id,
-      amount,
-      reason,
-      billing_period_start: row.billing_period_start,
-      billing_period_end: row.billing_period_end,
-      report_id: row.report_id,
-    });
-
-  if (error && error.code !== UNIQUE_VIOLATION) {
-    throw new Error(`Could not ${failureVerb} credit for Report: ${error.message}`);
-  }
+  await unwrap(
+    `${failureVerb} credit for Report`,
+    serviceRoleClient()
+      .from(CREDIT_LEDGER_TABLE)
+      .insert({
+        user_id: row.user_id,
+        amount,
+        reason,
+        billing_period_start: row.billing_period_start,
+        billing_period_end: row.billing_period_end,
+        report_id: row.report_id,
+      }),
+    { tolerate: UNIQUE_VIOLATION },
+  );
 }
 
 /**
